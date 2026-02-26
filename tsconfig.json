@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]                // or whatever folder `@` should point at
+    },
+    "resolveJsonModule": true,        // allow `import … from './foo.json'`
+    "esModuleInterop": true,          // often used with JSON imports
+    "moduleResolution": "node"        // ensure node‑style lookup
+  }
+}

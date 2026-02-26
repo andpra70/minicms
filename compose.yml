@@ -1,0 +1,9 @@
+services:
+  minicms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: minicms
+    ports:
+      - "6061:6061"
+    restart: unless-stopped

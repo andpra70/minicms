@@ -1,0 +1,181 @@
+{
+  "logo": "Mini CMS",
+  "items": [
+    {
+      "id": "home",
+      "label": "Home",
+      "path": "/"
+    },
+    {
+      "id": "about",
+      "label": "Chi Siamo",
+      "path": "/about"
+    },
+    {
+      "id": "services",
+      "label": "Servizi",
+      "path": "/services"
+    },
+    {
+      "id": "blog",
+      "label": "Blog",
+      "path": "/blog"
+    },
+    {
+      "id": "contact",
+      "label": "Contatti",
+      "path": "/contact"
+    }
+  ],
+  "pages": {
+    "home": {
+      "id": "home",
+      "title": "Benvenuto",
+      "sections": [
+        {
+          "type": "hero",
+          "title": "Gestisci i tuoi contenuti facilmente",
+          "subtitle": "Un sistema CMS leggero basato su JSON con temi intercambiabili",
+          "image": "img/me.webapp",
+          "imagePosX": 50,
+          "imagePosY": 50,
+          "cta": {
+            "text": "Scopri di più",
+            "link": "/about"
+          }
+        },
+        {
+          "type": "features",
+          "title": "Caratteristiche Principali",
+          "items": [
+            {
+              "title": "Gestione JSON",
+              "description": "Tutti i contenuti e il menu sono gestiti tramite file JSON statici",
+              "image": "public/img/me.webp",
+              "imagePosX": 50,
+              "imagePosY": 50
+            },
+            {
+              "title": "Temi Configurabili",
+              "description": "Cambia tema con un semplice click, sistema completamente modulare",
+              "image": "https://images.unsplash.com/photo-1691073112675-9685bc6779bf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxyZXNwb25zaXZlJTIwZGVzaWduJTIwbW9iaWxlfGVufDF8fHx8MTc3MDEyNjU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            },
+            {
+              "title": "Responsive",
+              "description": "Ottimizzato per tutti i dispositivi, mobile-first design",
+              "image": "https://images.unsplash.com/photo-1627599936744-51d288f89af4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3ZWIlMjBkZXZlbG9wbWVudCUyMG9mZmljZXxlbnwxfHx8fDE3NzAxMjY1NTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            }
+          ]
+        }
+      ]
+    },
+    "about": {
+      "id": "about",
+      "title": "Chi Siamo",
+      "sections": [
+        {
+          "type": "content",
+          "title": "La Nostra Storia",
+          "content": "Siamo un team dedicato a creare soluzioni web innovative e facili da usare. Il nostro Mini CMS rappresenta la filosofia di semplicità ed efficienza che guida il nostro lavoro ogni giorno.",
+          "image": "https://images.unsplash.com/photo-1758518729908-d4220a678d81?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxidXNpbmVzcyUyMGNvbnN1bHRpbmclMjB0ZWFtfGVufDF8fHx8MTc3MDAzODUzNnww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+          "imagePosX": 50,
+          "imagePosY": 50
+        },
+        {
+          "type": "content",
+          "title": "La Nostra Missione",
+          "content": "Vogliamo rendere la gestione dei contenuti web accessibile a tutti, eliminando la complessità e mantenendo la potenza e la flessibilità necessarie per progetti moderni.",
+          "image": "https://images.unsplash.com/photo-1718220216044-006f43e3a9b1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBvZmZpY2UlMjB3b3Jrc3BhY2V8ZW58MXx8fHwxNzcwMDQxMzM0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+        }
+      ]
+    },
+    "services": {
+      "id": "services",
+      "title": "I Nostri Servizi",
+      "sections": [
+        {
+          "type": "services-list",
+          "items": [
+            {
+              "title": "Sviluppo Web",
+              "description": "Creiamo siti web moderni e performanti utilizzando le tecnologie più recenti",
+              "features": ["React", "TypeScript", "Tailwind CSS"],
+              "image": "https://images.unsplash.com/photo-1677469684112-5dfb3aa4d3df?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB3ZWIlMjBkZXZlbG9wbWVudHxlbnwxfHx8fDE3NzAwODUxOTl8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            },
+            {
+              "title": "CMS Personalizzati",
+              "description": "Sviluppiamo sistemi di gestione contenuti su misura per le tue esigenze",
+              "features": ["JSON-based", "Temi Custom", "API Integration"],
+              "image": "https://images.unsplash.com/photo-1745209428699-f2d62fc466a4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjdXN0b20lMjBjbXMlMjBzeXN0ZW18ZW58MXx8fHwxNzcwMTI2NTUzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            },
+            {
+              "title": "Consulenza",
+              "description": "Ti aiutiamo a scegliere le migliori soluzioni tecnologiche per il tuo progetto",
+              "features": ["Analisi", "Strategia", "Implementazione"],
+              "image": "https://images.unsplash.com/photo-1768633647910-7e6fb53e5b0f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0ZWNobmljYWwlMjBzdXBwb3J0JTIwaGVscHxlbnwxfHx8fDE3NzAxMjY1NTV8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            }
+          ]
+        }
+      ]
+    },
+    "blog": {
+      "id": "blog",
+      "title": "Blog",
+      "sections": [
+        {
+          "type": "blog-list",
+          "items": [
+            {
+              "id": "1",
+              "title": "Come Creare un CMS con JSON",
+              "excerpt": "Scopri come costruire un sistema di gestione contenuti leggero utilizzando solo file JSON statici",
+              "date": "2026-02-01",
+              "author": "Marco Rossi",
+              "image": "https://images.unsplash.com/photo-1638342863994-ae4eee256688?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibG9nJTIwd3JpdGluZyUyMGNvbnRlbnR8ZW58MXx8fHwxNzcwMTI2NTU1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            },
+            {
+              "id": "2",
+              "title": "Temi Intercambiabili in React",
+              "excerpt": "Una guida completa per implementare un sistema di temi dinamici nella tua applicazione React",
+              "date": "2026-01-28",
+              "author": "Laura Bianchi",
+              "image": "https://images.unsplash.com/photo-1558259299-5d46c4408730?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjcmVhdGl2ZSUyMHdyaXRpbmclMjBkZXNrfGVufDF8fHx8MTc3MDA3Mjc3MHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            },
+            {
+              "id": "3",
+              "title": "Perché Scegliere un CMS Statico",
+              "excerpt": "I vantaggi di utilizzare file JSON statici invece di un database tradizionale",
+              "date": "2026-01-25",
+              "author": "Giuseppe Verdi",
+              "image": "https://images.unsplash.com/photo-1627599936744-51d288f89af4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3ZWIlMjBkZXZlbG9wbWVudCUyMG9mZmljZXxlbnwxfHx8fDE3NzAxMjY1NTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            }
+          ]
+        }
+      ]
+    },
+    "contact": {
+      "id": "contact",
+      "title": "Contattaci",
+      "sections": [
+        {
+          "type": "contact-info",
+          "info": [
+            {
+              "label": "Email",
+              "value": "info@minicms.com"
+            },
+            {
+              "label": "Telefono",
+              "value": "+39 02 1234567"
+            },
+            {
+              "label": "Indirizzo",
+              "value": "Via Roma 123, Milano, Italia"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "gallery": []
+}

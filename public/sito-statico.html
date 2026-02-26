@@ -1,0 +1,623 @@
+
+    <!DOCTYPE html>
+    <html lang="it">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Mini CMS - Sito Statico</title>
+      
+    <style>
+      :root {
+        --color-primary: #10b981;
+        --color-secondary: #059669;
+        --color-accent: #f59e0b;
+        --color-text: #064e3b;
+        --color-text-secondary: #6b7280;
+        --color-background: #f0fdf4;
+        --color-surface: #ffffff;
+        --color-border: #d1fae5;
+        --border-radius: 12px;
+        --font-heading: Georgia, serif;
+        --font-body: system-ui, -apple-system, sans-serif;
+        --container-width: 1200px;
+        --header-background: url(https://images.unsplash.com/photo-1595411425732-e69c1abe2763?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGdlb21ldHJpYyUyMHBhdHRlcm58ZW58MXx8fHwxNzcwMDg4MzE1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral);
+        --footer-background: url(https://images.unsplash.com/photo-1595411425732-e69c1abe2763?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGdlb21ldHJpYyUyMHBhdHRlcm58ZW58MXx8fHwxNzcwMDg4MzE1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral);
+        --logo-url: url(https://images.unsplash.com/photo-1677321303562-67081b831bda?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtaW5pbWFsJTIwY21zJTIwbG9nbyUyMGljb258ZW58MXx8fHwxNzcwMTI2OTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-body);
+        background-color: var(--color-background);
+        color: var(--color-text);
+        line-height: 1.6;
+      }
+
+      .container {
+        max-width: var(--container-width);
+        margin: 0 auto;
+        padding: 0 1rem;
+      }
+
+      /* Header */
+      header {
+        background-color: var(--color-surface);
+        border-bottom: 1px solid var(--color-border);
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        backdrop-filter: blur(8px);
+        position: relative;
+        overflow: hidden;
+      }
+
+      header::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: var(--header-background);
+        background-size: cover;
+        background-position: center;
+        opacity: 0.15;
+      }
+
+      nav {
+        position: relative;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 4rem;
+        padding: 0 1rem;
+        max-width: var(--container-width);
+        margin: 0 auto;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: bold;
+        font-size: 1.25rem;
+        color: var(--color-primary);
+        text-decoration: none;
+        font-family: var(--font-heading);
+      }
+
+      .logo-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        background-image: var(--logo-url);
+        background-size: cover;
+        background-position: center;
+        border-radius: var(--border-radius);
+        border: 2px solid var(--color-primary);
+      }
+
+      .nav-menu {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+      }
+
+      .nav-link {
+        color: var(--color-text);
+        text-decoration: none;
+        transition: opacity 0.2s;
+        font-weight: 400;
+      }
+
+      .nav-link.active {
+        color: var(--color-primary);
+        font-weight: 600;
+      }
+
+      .nav-link:hover {
+        opacity: 0.8;
+      }
+
+      /* Main Content */
+      main {
+        min-height: calc(100vh - 8rem);
+      }
+
+      section {
+        padding: 4rem 0;
+      }
+
+      h1 {
+        font-size: 3rem;
+        font-weight: bold;
+        margin-bottom: 1.5rem;
+        color: var(--color-text);
+        font-family: var(--font-heading);
+      }
+
+      h2 {
+        font-size: 2.25rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+        color: var(--color-text);
+        font-family: var(--font-heading);
+      }
+
+      h3 {
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-bottom: 0.75rem;
+        color: var(--color-primary);
+      }
+
+      p {
+        color: var(--color-text-secondary);
+        margin-bottom: 1rem;
+      }
+
+      .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1rem 2rem;
+        background-color: var(--color-primary);
+        color: white;
+        text-decoration: none;
+        border-radius: var(--border-radius);
+        font-weight: 600;
+        transition: transform 0.2s;
+      }
+
+      .btn-primary:hover {
+        transform: scale(1.05);
+      }
+
+      /* Hero Section */
+      .hero {
+        text-align: center;
+        padding: 5rem 0;
+      }
+
+      .hero img {
+        width: 100%;
+        max-width: 64rem;
+        height: 16rem;
+        object-fit: cover;
+        border-radius: var(--border-radius);
+        margin-bottom: 2rem;
+      }
+
+      .hero h1 {
+        font-size: 3.5rem;
+        margin-bottom: 2rem;
+      }
+
+      .hero p {
+        font-size: 1.25rem;
+        margin-bottom: 2rem;
+        max-width: 48rem;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      /* Grid */
+      .grid {
+        display: grid;
+        gap: 2rem;
+      }
+
+      .grid-3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .card {
+        background-color: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        overflow: hidden;
+      }
+
+      .card img {
+        width: 100%;
+        height: 12rem;
+        object-fit: cover;
+      }
+
+      .card-content {
+        padding: 1.5rem;
+      }
+
+      .content-image {
+        width: 100%;
+        height: 16rem;
+        object-fit: cover;
+        border-radius: var(--border-radius);
+      }
+
+      .grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+        align-items: center;
+        gap: 2rem;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        background-color: var(--color-background);
+        color: var(--color-primary);
+        border: 1px solid var(--color-border);
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        margin: 0.25rem;
+      }
+
+      /* Contact */
+      .contact-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.5rem;
+        background-color: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        margin-bottom: 1rem;
+      }
+
+      .contact-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        background-color: var(--color-primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+      }
+
+      /* Footer */
+      footer {
+        background-color: var(--color-surface);
+        border-top: 1px solid var(--color-border);
+        padding: 2rem 0;
+        text-align: center;
+        color: var(--color-text-secondary);
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .grid-3, .grid-2 {
+          grid-template-columns: 1fr;
+        }
+
+        .nav-menu {
+          display: none;
+        }
+
+        h1 {
+          font-size: 2.5rem;
+        }
+
+        .hero h1 {
+          font-size: 2.5rem;
+        }
+
+        h2 {
+          font-size: 1.875rem;
+        }
+      }
+
+      /* Single Page App Navigation */
+      .page {
+        display: none;
+      }
+
+      .page.active {
+        display: block;
+      }
+
+      .mobile-menu-toggle {
+        display: none;
+      }
+
+      @media (max-width: 768px) {
+        .mobile-menu-toggle {
+          display: block;
+        }
+
+        .nav-menu {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background-color: var(--color-surface);
+          border-top: 1px solid var(--color-border);
+          flex-direction: column;
+          padding: 1rem;
+          gap: 0.5rem;
+        }
+
+        .nav-menu.mobile-open {
+          display: flex;
+        }
+      }
+    </style>
+  
+    </head>
+    <body>
+      <header>
+        <nav>
+          <a href="#home" class="logo">
+            <div class="logo-icon"></div>
+            Mini CMS
+          </a>
+          <div class="nav-menu">
+            
+    <a href="#home" class="nav-link active" data-page="home">Home</a>
+  
+    <a href="#about" class="nav-link " data-page="about">Chi Siamo</a>
+  
+    <a href="#services" class="nav-link " data-page="services">Servizi</a>
+  
+    <a href="#blog" class="nav-link " data-page="blog">Blog</a>
+  
+    <a href="#pippo" class="nav-link " data-page="pippo">Pippo</a>
+  
+    <a href="#contact" class="nav-link " data-page="contact">Contatti</a>
+  
+          </div>
+          <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>
+        </nav>
+      </header>
+
+      <main>
+        
+      <section class="page" id="home">
+        <div class="hero">
+          <img src="img/me.webp" alt="Benvenuto !" style="object-position: 50% 30%" />
+          <h1>Benvenuto !</h1>
+          <p>Un sistema CMS leggero basato su JSON con temi intercambiabili</p>
+          
+            <a href="#about" class="btn-primary">
+              Scopri di più
+              <span>→</span>
+            </a>
+          
+        </div>
+      </section>
+    
+      <section class="page active" id="home">
+        <div class="container">
+          <h2 style="text-align: center; margin-bottom: 3rem;">Caratteristiche Principali</h2>
+          <div class="grid grid-3">
+            
+      <div class="card">
+        <img src="img/me.webp" alt="Gestione JSON" style="object-position: 50% 50%" />
+        <div class="card-content">
+          <h3>Gestione JSON</h3>
+          <p>Tutti i contenuti e il menu sono gestiti tramite file JSON statici</p>
+        </div>
+      </div>
+    
+      <div class="card">
+        <img src="img/2.webp" alt="Temi Configurabili" style="object-position: 50% 50%" />
+        <div class="card-content">
+          <h3>Temi Configurabili</h3>
+          <p>Cambia tema con un semplice click, sistema completamente modulare</p>
+        </div>
+      </div>
+    
+      <div class="card">
+        <img src="img/6.jpg" alt="Responsive" style="object-position: 50% 50%" />
+        <div class="card-content">
+          <h3>Responsive</h3>
+          <p>Ottimizzato per tutti i dispositivi, mobile-first design</p>
+        </div>
+      </div>
+    
+          </div>
+        </div>
+      </section>
+    
+      <section class="page" id="about">
+        <div class="container">
+          <div class="grid grid-2">
+            <div>
+              <h2>La Nostra Storia</h2>
+              <p style="font-size: 1.125rem; line-height: 1.75;">Siamo un team dedicato a creare soluzioni web innovative e facili da usare. Il nostro Mini CMS rappresenta la filosofia di semplicità ed efficienza che guida il nostro lavoro ogni giorno.Siamo un team dedicato a creare soluzioni web innovative e facili da usare. Il nostro Mini CMS rappresenta la filosofia di semplicità ed efficienza che guida il nostro lavoro ogni giorno.Siamo un team dedicato a creare soluzioni web innovative e facili da usare. Il nostro Mini CMS rappresenta la filosofia di semplicità ed efficienza che guida il nostro lavoro ogni giorno.Siamo un team dedicato a creare soluzioni web innovative e facili da usare. Il nostro Mini CMS rappresenta la filosofia di semplicità ed efficienza che guida il nostro lavoro ogni giorno.Siamo un team dedicato a creare soluzioni web innovative e facili da usare. Il nostro Mini CMS rappresenta la filosofia di semplicità ed efficienza che guida il nostro lavoro ogni giorno.Siamo un team dedicato a creare soluzioni web innovative e facili da usare. Il nostro Mini CMS rappresenta la filosofia di semplicità ed efficienza che guida il nostro lavoro ogni giorno.</p>
+            </div>
+            <img src="img/4.gif" alt="La Nostra Storia" class="content-image" style="object-position: 51% 48%" />
+          </div>
+        </div>
+      </section>
+    
+      <section class="page" id="about">
+        <div class="container">
+          <div class="grid grid-2">
+            <div>
+              <h2>La Nostra Missione</h2>
+              <p style="font-size: 1.125rem; line-height: 1.75;">Vogliamo rendere la gestione dei contenuti web accessibile a tutti, eliminando la complessità e mantenendo la potenza e la flessibilità necessarie per progetti moderni.</p>
+            </div>
+            <img src="img/3.webp" alt="La Nostra Missione" class="content-image" style="object-position: 50% 50%" />
+          </div>
+        </div>
+      </section>
+    
+      <section class="page" id="services">
+        <div class="container">
+          
+      <div class="card" style="margin-bottom: 2rem;">
+        <img src="img/5.jpg" alt="Sviluppo Web" style="object-position: 50% 12%" />
+        <div class="card-content">
+          <h3>Sviluppo Web</h3>
+          <p>Creiamo siti web moderni e performanti utilizzando le tecnologie più recenti</p>
+          <div>
+            <span class="badge">React</span><span class="badge">TypeScript</span><span class="badge">Tailwind CSS</span>
+          </div>
+        </div>
+      </div>
+    
+      <div class="card" style="margin-bottom: 2rem;">
+        <img src="img/6.jpg" alt="CMS Personalizzati" style="object-position: 50% 50%" />
+        <div class="card-content">
+          <h3>CMS Personalizzati</h3>
+          <p>Sviluppiamo sistemi di gestione contenuti su misura per le tue esigenze</p>
+          <div>
+            <span class="badge">JSON-based</span><span class="badge">Temi Custom</span><span class="badge">API Integration</span>
+          </div>
+        </div>
+      </div>
+    
+      <div class="card" style="margin-bottom: 2rem;">
+        <img src="img/2.webp" alt="Consulenza" style="object-position: 50% 50%" />
+        <div class="card-content">
+          <h3>Consulenza</h3>
+          <p>Ti aiutiamo a scegliere le migliori soluzioni tecnologiche per il tuo progetto</p>
+          <div>
+            <span class="badge">Analisi</span><span class="badge">Strategia</span><span class="badge">Implementazione</span>
+          </div>
+        </div>
+      </div>
+    
+        </div>
+      </section>
+    
+      <section class="page" id="blog">
+        <div class="container">
+          <div class="grid grid-3">
+            
+      <article class="card">
+        <img src="img/4.gif" alt="Come Creare un CMS con JSON" style="object-position: 60% 44%" />
+        <div class="card-content">
+          <h3>Come Creare un CMS con JSON</h3>
+          <p>Scopri come costruire un sistema di gestione contenuti leggero utilizzando solo file JSON statici</p>
+          <div style="display: flex; justify-content: space-between; font-size: 0.875rem; color: var(--color-text-secondary);">
+            <span>Marco Rossi</span>
+            <span>01/02/2026</span>
+          </div>
+        </div>
+      </article>
+    
+      <article class="card">
+        <img src="img/5.jpg" alt="Temi Intercambiabili in React" style="object-position: 50% 50%" />
+        <div class="card-content">
+          <h3>Temi Intercambiabili in React</h3>
+          <p>Una guida completa per implementare un sistema di temi dinamici nella tua applicazione React</p>
+          <div style="display: flex; justify-content: space-between; font-size: 0.875rem; color: var(--color-text-secondary);">
+            <span>Laura Bianchi</span>
+            <span>28/01/2026</span>
+          </div>
+        </div>
+      </article>
+    
+      <article class="card">
+        <img src="img/6.jpg" alt="Perché Scegliere un CMS Statico" style="object-position: 50% 0%" />
+        <div class="card-content">
+          <h3>Perché Scegliere un CMS Statico</h3>
+          <p>I vantaggi di utilizzare file JSON statici invece di un database tradizionale</p>
+          <div style="display: flex; justify-content: space-between; font-size: 0.875rem; color: var(--color-text-secondary);">
+            <span>Giuseppe Verdi</span>
+            <span>25/01/2026</span>
+          </div>
+        </div>
+      </article>
+    
+          </div>
+        </div>
+      </section>
+    
+      <section class="page" id="contact">
+        <div class="container" style="max-width: 32rem;">
+          
+        <div class="contact-item">
+          <div class="contact-icon">📧</div>
+          <div>
+            <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--color-text-secondary);">
+              Email
+            </div>
+            <div style="font-size: 1.125rem;">
+              info@minicms.com
+            </div>
+          </div>
+        </div>
+      
+        <div class="contact-item">
+          <div class="contact-icon">📞</div>
+          <div>
+            <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--color-text-secondary);">
+              Telefono
+            </div>
+            <div style="font-size: 1.125rem;">
+              +39 02 1234567
+            </div>
+          </div>
+        </div>
+      
+        <div class="contact-item">
+          <div class="contact-icon">📍</div>
+          <div>
+            <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--color-text-secondary);">
+              Indirizzo
+            </div>
+            <div style="font-size: 1.125rem;">
+              Via Roma 123, Milano, Italia
+            </div>
+          </div>
+        </div>
+      
+        </div>
+      </section>
+    
+      </main>
+
+      <footer>
+        <div class="container">
+          <p>&copy; 2026 Mini CMS. Tutti i diritti riservati.</p>
+        </div>
+      </footer>
+
+      <script>
+        function showPage(pageId) {
+          // Hide all pages
+          document.querySelectorAll('.page').forEach(page => {
+            page.classList.remove('active');
+          });
+          
+          // Show selected page
+          const targetPages = document.querySelectorAll(`.page[id="${pageId}"]`);
+          targetPages.forEach(page => {
+            page.classList.add('active');
+          });
+          
+          // Update active nav link
+          document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+          });
+          document.querySelectorAll(`.nav-link[data-page="${pageId}"]`).forEach(link => {
+            link.classList.add('active');
+          });
+        }
+
+        // Handle navigation
+        document.addEventListener('click', function(e) {
+          if (e.target.classList.contains('nav-link')) {
+            e.preventDefault();
+            const pageId = e.target.getAttribute('data-page');
+            showPage(pageId);
+            
+            // Close mobile menu if open
+            document.querySelector('.nav-menu').classList.remove('mobile-open');
+          }
+        });
+
+        function toggleMobileMenu() {
+          document.querySelector('.nav-menu').classList.toggle('mobile-open');
+        }
+
+        // Show home page by default
+        showPage('home');
+      </script>
+    </body>
+    </html>
+  

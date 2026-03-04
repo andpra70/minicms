@@ -205,7 +205,7 @@ function getSectionLabel(type: string) {
 }
 
 function createSectionTemplate(type: string) {
-  const defaultImage = '/img/me.webp';
+  const defaultImage = 'img/me.webp';
   switch (type) {
     case 'hero':
       return {
@@ -259,7 +259,7 @@ function createSectionTemplate(type: string) {
 }
 
 function createItemTemplate(sectionType: string) {
-  const defaultImage = '/img/me.webp';
+  const defaultImage = 'img/me.webp';
 
   if (sectionType === 'features') {
     return {

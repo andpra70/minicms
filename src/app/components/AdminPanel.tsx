@@ -3,14 +3,15 @@ import { Settings, X, Save, Download, Upload, Paintbrush, FileCode, Maximize2, M
 import { useAdmin } from '@/contexts/AdminContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { themes } from '@/themes/themes';
+import { resolveApiUrl, resolveAppAssetUrl } from '@/app/lib/urls';
 
 const LOCAL_IMAGE_OPTIONS = [
-  '/img/2.webp',
-  '/img/3.webp',
-  '/img/4.gif',
-  '/img/5.jpg',
-  '/img/6.jpg',
-  '/img/me.webp',
+  'img/2.webp',
+  'img/3.webp',
+  'img/4.gif',
+  'img/5.jpg',
+  'img/6.jpg',
+  'img/me.webp',
 ];
 
 const FONT_OPTIONS = [
@@ -71,7 +72,7 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
     
     // Se è già un path locale (inizia con 'img/'), mantienilo
     if (imageUrl.startsWith('img/') || imageUrl.startsWith('/img/')) {
-      return imageUrl;
+      return imageUrl.replace(/^\/+/, '');
     }
 
     if (imageUrl.startsWith('data:image/')) {
@@ -864,7 +865,7 @@ function ContentEditor() {
       
       // Salva nel folder public tramite API
       try {
-        const response = await fetch('/api/save-static-html', {
+        const response = await fetch(resolveApiUrl('api/save-static-html'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ html: staticHTML })
@@ -1253,7 +1254,7 @@ function ThemeEditor() {
                 }}
                 title={imagePath}
               >
-                <img src={imagePath} alt={imagePath} className="w-full h-full object-cover" />
+                <img src={resolveAppAssetUrl(imagePath)} alt={imagePath} className="w-full h-full object-cover" />
               </button>
             ))}
           </div>

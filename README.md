@@ -12,4 +12,14 @@
   
   ## docker
 
-  docker compose up --build -d 
+  Use Docker Compose v2:
+
+  `docker compose up --build -d`
+
+  If you previously used `docker-compose` v1 and hit an error like `'ContainerConfig'`, clean up the old stack first:
+
+  `docker compose down --remove-orphans`
+
+  If needed, remove the old standalone container too:
+
+  `docker rm -f minicms`

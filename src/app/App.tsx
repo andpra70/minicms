@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AdminProvider } from '@/contexts/AdminContext';
 import { Header } from './components/Header';
@@ -10,7 +10,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AdminProvider>
-        <BrowserRouter>
+        <HashRouter>
           <div 
             className="min-h-screen flex flex-col transition-colors duration-300"
             style={{ 
@@ -28,7 +28,7 @@ export default function App() {
             <Footer />
             <AdminPanel />
           </div>
-        </BrowserRouter>
+        </HashRouter>
       </AdminProvider>
     </ThemeProvider>
   );

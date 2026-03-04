@@ -2,14 +2,15 @@ import { useState, useRef, useEffect } from 'react';
 import { Edit2, Check, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAdmin } from '@/contexts/AdminContext';
+import { resolveAppAssetUrl } from '@/app/lib/urls';
 
 const LOCAL_IMAGE_GALLERY = [
-  '/img/2.webp',
-  '/img/3.webp',
-  '/img/4.gif',
-  '/img/5.jpg',
-  '/img/6.jpg',
-  '/img/me.webp',
+  'img/2.webp',
+  'img/3.webp',
+  'img/4.gif',
+  'img/5.jpg',
+  'img/6.jpg',
+  'img/me.webp',
 ];
 const GALLERY_REF_PREFIX = 'gallery:';
 
@@ -23,7 +24,7 @@ function getEmbeddedGallery(content: any) {
 
 function resolveImageSource(value: string, content: any) {
   if (!isGalleryRef(value)) {
-    return value;
+    return resolveAppAssetUrl(value);
   }
   const id = value.slice(GALLERY_REF_PREFIX.length);
   const image = getEmbeddedGallery(content).find((item: any) => item.id === id);
@@ -433,7 +434,7 @@ export function InlineImageEditor({ src, alt, path, className = '', style }: Inl
                     }}
                     title={imagePath}
                   >
-                    <img src={imagePath} alt={imagePath} className="w-full h-full object-cover" />
+                    <img src={resolveAppAssetUrl(imagePath)} alt={imagePath} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -717,7 +718,7 @@ export function InlineImagePositionEditor({
                     }}
                     title={imagePath}
                   >
-                    <img src={imagePath} alt={imagePath} className="w-full h-full object-cover" />
+                    <img src={resolveAppAssetUrl(imagePath)} alt={imagePath} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>

@@ -2,7 +2,6 @@ const REMOTE_FILESERVER_BASE = 'https://zanotti.iliadboxos.it:55443/fileserver';
 const FILESERVER_STORAGE_KEY = 'cms-fileserver-path';
 
 interface FileserverClient {
-  loadFileContent: (path: string) => Promise<{ content?: string } | string>;
   saveFileContent: (path: string, content: string) => Promise<unknown>;
   uploadFiles: (path: string, files: File[], onProgress?: (progress: number) => void) => Promise<unknown>;
 }
@@ -96,20 +95,6 @@ function getClient(api: FileserverApiGlobal | null) {
   return api.createClient({ apiBase: getFileserverApiBase() });
 }
 
-function normalizeReadResult(result: { content?: string } | string) {
-  if (typeof result === 'string') {
-    return result;
-  }
-
-  if (result && typeof result === 'object') {
-    if (typeof result.content === 'string') {
-      return result.content;
-    }
-  }
-
-  throw new Error('Formato risposta fileserver non supportato');
-}
-
 function splitPath(path: string) {
   const normalized = String(path || '').replace(/^\/+|\/+$/g, '');
   const segments = normalized.split('/').filter(Boolean);
@@ -147,17 +132,5 @@ export async function saveTextToFileserver(path: string, content: string) {
 }
 
 export async function loadTextFromFileserver(path: string) {
-  const api = await ensureFileserverApiLoaded();
-  const client = getClient(api);
-  try {
-    const result = await client.loadFileContent(path);
-    return normalizeReadResult(result);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!message.includes('File too large to edit')) {
-      throw error;
-    }
-
-    return fetchRawFileText(path);
-  }
+  return fetchRawFileText(path);
 }

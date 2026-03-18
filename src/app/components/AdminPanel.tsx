@@ -160,6 +160,20 @@ function ThemeImageDropField({
           }}
         />
       </label>
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="px-2 py-1 rounded text-xs"
+          style={{
+            backgroundColor: 'var(--color-background)',
+            color: 'var(--color-text)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          [x] Rimuovi immagine
+        </button>
+      )}
       {localOptions.length > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {localOptions.map((imagePath) => (

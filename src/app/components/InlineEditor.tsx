@@ -730,7 +730,71 @@ export function InlineImagePositionEditor({
   const [localScale, setLocalScale] = useState(clampScale(scale));
   const [isDragging, setIsDragging] = useState(false);
   const [isDropOver, setIsDropOver] = useState(false);
+  const [isDirectPanning, setIsDirectPanning] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
+  const imageFrameRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isDirectPanning && !isEditing) {
+      setImageValue(src);
+      setLocalPosX(posX);
+      setLocalPosY(posY);
+      setLocalScale(clampScale(scale));
+    }
+  }, [src, posX, posY, scale, isDirectPanning, isEditing]);
+
+  const persistDirectPan = (nextPosX: number, nextPosY: number) => {
+    const newContent = JSON.parse(JSON.stringify(content));
+
+    let current = newContent;
+    for (let i = 0; i < posXPath.length - 1; i++) {
+      current = current[posXPath[i]];
+    }
+    current[posXPath[posXPath.length - 1]] = Math.round(nextPosX);
+
+    current = newContent;
+    for (let i = 0; i < posYPath.length - 1; i++) {
+      current = current[posYPath[i]];
+    }
+    current[posYPath[posYPath.length - 1]] = Math.round(nextPosY);
+
+    updateContent(newContent);
+  };
+
+  const updatePanFromPointer = (clientX: number, clientY: number) => {
+    if (!imageFrameRef.current) {
+      return;
+    }
+
+    const rect = imageFrameRef.current.getBoundingClientRect();
+    const nextPosX = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+    const nextPosY = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
+    setLocalPosX(Math.round(nextPosX));
+    setLocalPosY(Math.round(nextPosY));
+  };
+
+  useEffect(() => {
+    if (!isDirectPanning) {
+      return;
+    }
+
+    const handlePointerMove = (event: MouseEvent) => {
+      updatePanFromPointer(event.clientX, event.clientY);
+    };
+
+    const handlePointerUp = () => {
+      setIsDirectPanning(false);
+      persistDirectPan(localPosX, localPosY);
+    };
+
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp, { once: true });
+
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+    };
+  }, [isDirectPanning, localPosX, localPosY, content, posXPath, posYPath]);
 
   const handleSave = () => {
     const newContent = JSON.parse(JSON.stringify(content));
@@ -869,17 +933,49 @@ export function InlineImagePositionEditor({
       onDragLeave={() => setIsDropOver(false)}
       onDrop={handleDirectDrop}
     >
-      <img 
-        src={resolvedCurrentSrc} 
-        alt={alt} 
-        className={className} 
-        style={{
-          ...style,
-          objectPosition: isEditing ? `${localPosX}% ${localPosY}%` : `${posX}% ${posY}%`,
-          transform: `scale(${(isEditing ? localScale : clampScale(scale)) / 100})`,
-          transformOrigin: `${isEditing ? localPosX : posX}% ${isEditing ? localPosY : posY}%`,
-        }} 
-      />
+      <div
+        ref={imageFrameRef}
+        className="relative"
+        onMouseDown={(event) => {
+          if (!canEdit || isEditing || event.button !== 0) {
+            return;
+          }
+          const target = event.target as HTMLElement | null;
+          if (target?.closest('button')) {
+            return;
+          }
+          event.preventDefault();
+          updatePanFromPointer(event.clientX, event.clientY);
+          setIsDirectPanning(true);
+        }}
+        style={{ cursor: canEdit && !isEditing ? (isDirectPanning ? 'grabbing' : 'grab') : undefined }}
+      >
+        <img 
+          src={resolvedCurrentSrc} 
+          alt={alt} 
+          className={className} 
+          style={{
+            ...style,
+            objectPosition: `${isEditing || isDirectPanning ? localPosX : posX}% ${isEditing || isDirectPanning ? localPosY : posY}%`,
+            transform: `scale(${(isEditing ? localScale : clampScale(scale)) / 100})`,
+            transformOrigin: `${isEditing || isDirectPanning ? localPosX : posX}% ${isEditing || isDirectPanning ? localPosY : posY}%`,
+            userSelect: 'none',
+          }} 
+          draggable={false}
+        />
+        {canEdit && !isEditing && (
+          <div
+            className="absolute left-3 bottom-3 px-2 py-1 rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+            style={{
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              color: '#ffffff',
+              zIndex: 12,
+            }}
+          >
+            Trascina per crop
+          </div>
+        )}
+      </div>
       {isDropOver && !isEditing && (
         <div
           className="absolute inset-0 flex items-center justify-center rounded"

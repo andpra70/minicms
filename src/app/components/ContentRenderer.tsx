@@ -38,11 +38,11 @@ function getSectionAnchor(section: Section, sectionIndex: number) {
 }
 
 export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
-  const { isAdmin, content, updateContent } = useAdmin();
+  const { canEdit, content, updateContent } = useAdmin();
   const [draggedSectionIndex, setDraggedSectionIndex] = useState<number | null>(null);
 
   const handleDragStart = (e: React.DragEvent<HTMLElement>, index: number) => {
-    if (!isAdmin) {
+    if (!canEdit) {
       return;
     }
     setDraggedSectionIndex(index);
@@ -108,10 +108,10 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
           data-section-index={index}
           className="relative"
           onDragOverCapture={(e) => {
-            if (isAdmin) e.preventDefault();
+            if (canEdit) e.preventDefault();
           }}
           onDropCapture={(e) => {
-            if (!isAdmin) {
+            if (!canEdit) {
               return;
             }
             e.preventDefault();
@@ -122,12 +122,12 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
             }
           }}
           style={{
-            outline: isAdmin && draggedSectionIndex === index ? '2px dashed var(--color-primary)' : undefined,
+            outline: canEdit && draggedSectionIndex === index ? '2px dashed var(--color-primary)' : undefined,
             borderRadius: 'var(--border-radius)',
             scrollMarginTop: '96px',
           }}
         >
-          {isAdmin && (
+          {canEdit && (
             <button
               draggable
               onDragStart={(e) => handleDragStart(e, index)}
@@ -143,7 +143,7 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
               <GripVertical className="w-4 h-4" />
             </button>
           )}
-          {isAdmin && (
+          {canEdit && (
             <button
               onClick={() => removeSection(index)}
               className="absolute top-0 right-0 z-10 w-7 h-7 rounded-full inline-flex items-center justify-center"
@@ -160,7 +160,7 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
           <SectionRenderer section={section} pageId={pageId} sectionIndex={index} />
         </div>
       ))}
-      {isAdmin && (
+      {canEdit && (
         <div
           className="p-4 rounded-lg"
           style={{
@@ -264,6 +264,7 @@ function createSectionTemplate(type: string) {
         title: 'Calendario eventi',
         description: 'Date importanti in evidenza.',
         entries: '2026-03-20\n2026-03-24..2026-03-27\n2026-04-02',
+        notes: 'Le date evidenziate indicano aperture speciali ed eventi.',
       };
     case 'content':
     default:
@@ -355,7 +356,8 @@ function SectionRenderer({ section, pageId, sectionIndex }: { section: Section; 
   }
 }
 
-function CalendarSection({ title, description, entries, pageId, sectionIndex }: any) {
+function CalendarSection({ title, description, entries, notes, pageId, sectionIndex }: any) {
+  const { canEdit } = useAdmin();
   const parsed = parseCalendarInput(entries);
 
   return (
@@ -399,12 +401,14 @@ function CalendarSection({ title, description, entries, pageId, sectionIndex }: 
             type="textarea"
             path={['pages', pageId, 'sections', sectionIndex, 'entries']}
           />
-          <div
-            className="mt-2 text-xs"
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
-            Usa una data per riga oppure separa con virgola o punto e virgola. Intervalli: `2026-03-24..2026-03-27`
-          </div>
+          {canEdit && (
+            <div
+              className="mt-2 text-xs"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              Usa una data per riga oppure separa con virgola o punto e virgola. Intervalli: `2026-03-24..2026-03-27`
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {parsed.entries.map((entry, index) => (
@@ -420,6 +424,19 @@ function CalendarSection({ title, description, entries, pageId, sectionIndex }: 
             </span>
           ))}
         </div>
+        <p
+          style={{
+            color: 'var(--color-text-secondary)',
+            fontFamily: 'var(--font-body-copy)',
+            fontSize: 'var(--size-body-copy)',
+          }}
+        >
+          <InlineEditor
+            value={notes}
+            type="textarea"
+            path={['pages', pageId, 'sections', sectionIndex, 'notes']}
+          />
+        </p>
       </div>
       <div
         className="rounded-lg p-4"
@@ -757,7 +774,7 @@ function HeroSection({ title, subtitle, image, imagePosX = 50, imagePosY = 50, i
 }
 
 function FeaturesSection({ title, items, pageId, sectionIndex }: any) {
-  const { isAdmin, content, updateContent } = useAdmin();
+  const { canEdit, content, updateContent } = useAdmin();
 
   const handleAddCard = () => {
     const newContent = JSON.parse(JSON.stringify(content));
@@ -809,7 +826,7 @@ function FeaturesSection({ title, items, pageId, sectionIndex }: any) {
               borderRadius: 'var(--border-radius)'
             }}
           >
-            {isAdmin && (
+            {canEdit && (
               <button
                 onClick={() => handleDeleteCard(index)}
                 className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full inline-flex items-center justify-center"
@@ -868,7 +885,7 @@ function FeaturesSection({ title, items, pageId, sectionIndex }: any) {
           </div>
         ))}
       </div>
-      {isAdmin && (
+      {canEdit && (
         <div className="mt-4">
           <button
             onClick={handleAddCard}
@@ -900,7 +917,7 @@ function ContentSection({
   pageId,
   sectionIndex
 }: any) {
-  const { isAdmin, content: siteContent, updateContent } = useAdmin();
+  const { canEdit, content: siteContent, updateContent } = useAdmin();
   // Compatibilità con vecchio campo singolo imagePlacement
   const fallbackX = imagePlacement === 'left' || imagePlacement === 'right' ? imagePlacement : 'right';
   const fallbackY = imagePlacement === 'top' || imagePlacement === 'bottom' ? imagePlacement : 'top';
@@ -961,7 +978,7 @@ function ContentSection({
 
   const imageBlock = image ? (
     <div className="relative">
-      {isAdmin && (
+      {canEdit && (
         <div
           className="absolute top-2 left-2 z-30 space-y-2 p-2 rounded"
           style={{
@@ -1061,7 +1078,7 @@ function ContentSection({
 }
 
 function ServicesListSection({ items, pageId, sectionIndex }: any) {
-  const { isAdmin, content, updateContent } = useAdmin();
+  const { canEdit, content, updateContent } = useAdmin();
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
   const MIN_IMAGE_HEIGHT = 50;
   const MAX_IMAGE_HEIGHT = 500;
@@ -1105,7 +1122,7 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
   };
 
   const handleDragStart = (e: React.DragEvent<HTMLElement>, index: number) => {
-    if (!isAdmin) {
+    if (!canEdit) {
       return;
     }
     setDraggedItemIndex(index);
@@ -1147,10 +1164,10 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
           key={index}
           className="rounded-lg overflow-hidden relative"
           onDragOverCapture={(e) => {
-            if (isAdmin) e.preventDefault();
+            if (canEdit) e.preventDefault();
           }}
           onDropCapture={(e) => {
-            if (!isAdmin) {
+            if (!canEdit) {
               return;
             }
             e.preventDefault();
@@ -1164,10 +1181,10 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
             backgroundColor: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--border-radius)',
-            outline: isAdmin && draggedItemIndex === index ? '2px dashed var(--color-primary)' : undefined,
+            outline: canEdit && draggedItemIndex === index ? '2px dashed var(--color-primary)' : undefined,
           }}
         >
-          {isAdmin && (
+          {canEdit && (
             <button
               draggable
               onDragStart={(e) => handleDragStart(e, index)}
@@ -1183,7 +1200,7 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
               <GripVertical className="w-4 h-4" />
             </button>
           )}
-          {isAdmin && (
+          {canEdit && (
             <button
               onClick={() => handleDeleteCard(index)}
               className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full inline-flex items-center justify-center"
@@ -1214,7 +1231,7 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
               />
             </div>
           )}
-          {isAdmin && (
+          {canEdit && (
             <div
               className="px-8 pt-4 pb-0"
               style={{ borderTop: item.image ? '1px solid var(--color-border)' : 'none' }}
@@ -1297,7 +1314,7 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
           </div>
         </div>
       ))}
-      {isAdmin && (
+      {canEdit && (
         <button
           onClick={handleAddCard}
           className="px-3 py-2 rounded text-sm font-medium inline-flex items-center gap-2"
@@ -1315,7 +1332,7 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
 }
 
 function BlogListSection({ items, pageId, sectionIndex }: any) {
-  const { isAdmin, content, updateContent } = useAdmin();
+  const { canEdit, content, updateContent } = useAdmin();
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
 
   const handleAddCard = () => {
@@ -1357,7 +1374,7 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
   };
 
   const handleDragStart = (e: React.DragEvent<HTMLElement>, index: number) => {
-    if (!isAdmin) {
+    if (!canEdit) {
       return;
     }
     setDraggedItemIndex(index);
@@ -1382,10 +1399,10 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
             key={item.id || `blog-${index}`}
             className="rounded-lg hover:shadow-lg transition-shadow overflow-hidden relative"
             onDragOverCapture={(e) => {
-              if (isAdmin) e.preventDefault();
+              if (canEdit) e.preventDefault();
             }}
             onDropCapture={(e) => {
-              if (!isAdmin) {
+              if (!canEdit) {
                 return;
               }
               e.preventDefault();
@@ -1399,10 +1416,10 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
               backgroundColor: 'var(--color-surface)',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--border-radius)',
-              outline: isAdmin && draggedItemIndex === index ? '2px dashed var(--color-primary)' : undefined,
+              outline: canEdit && draggedItemIndex === index ? '2px dashed var(--color-primary)' : undefined,
             }}
           >
-            {isAdmin && (
+            {canEdit && (
               <button
                 draggable
                 onDragStart={(e) => handleDragStart(e, index)}
@@ -1418,7 +1435,7 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
                 <GripVertical className="w-4 h-4" />
               </button>
             )}
-            {isAdmin && (
+            {canEdit && (
               <button
                 onClick={() => handleDeleteCard(index)}
                 className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full inline-flex items-center justify-center"
@@ -1487,7 +1504,7 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
           </article>
         ))}
       </div>
-      {isAdmin && (
+      {canEdit && (
         <button
           onClick={handleAddCard}
           className="px-3 py-2 rounded text-sm font-medium inline-flex items-center gap-2"
@@ -1505,7 +1522,7 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
 }
 
 function ContactInfoSection({ info, pageId, sectionIndex }: any) {
-  const { isAdmin, content, updateContent } = useAdmin();
+  const { canEdit, content, updateContent } = useAdmin();
   const [draggedInfoIndex, setDraggedInfoIndex] = useState<number | null>(null);
   const icons: { [key: string]: any } = {
     Email: Mail,
@@ -1552,7 +1569,7 @@ function ContactInfoSection({ info, pageId, sectionIndex }: any) {
   };
 
   const handleDragStart = (e: React.DragEvent<HTMLElement>, index: number) => {
-    if (!isAdmin) {
+    if (!canEdit) {
       return;
     }
     setDraggedInfoIndex(index);
@@ -1579,10 +1596,10 @@ function ContactInfoSection({ info, pageId, sectionIndex }: any) {
               key={index}
               className="flex items-center gap-4 p-6 rounded-lg relative"
               onDragOverCapture={(e) => {
-                if (isAdmin) e.preventDefault();
+                if (canEdit) e.preventDefault();
               }}
               onDropCapture={(e) => {
-                if (!isAdmin) {
+                if (!canEdit) {
                   return;
                 }
                 e.preventDefault();
@@ -1596,10 +1613,10 @@ function ContactInfoSection({ info, pageId, sectionIndex }: any) {
                 backgroundColor: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
                 borderRadius: 'var(--border-radius)',
-                outline: isAdmin && draggedInfoIndex === index ? '2px dashed var(--color-primary)' : undefined,
+                outline: canEdit && draggedInfoIndex === index ? '2px dashed var(--color-primary)' : undefined,
               }}
             >
-              {isAdmin && (
+              {canEdit && (
                 <button
                   draggable
                   onDragStart={(e) => handleDragStart(e, index)}
@@ -1615,7 +1632,7 @@ function ContactInfoSection({ info, pageId, sectionIndex }: any) {
                   <GripVertical className="w-4 h-4" />
                 </button>
               )}
-              {isAdmin && (
+              {canEdit && (
                 <button
                   onClick={() => handleDeleteCard(index)}
                   className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full inline-flex items-center justify-center"
@@ -1664,7 +1681,7 @@ function ContactInfoSection({ info, pageId, sectionIndex }: any) {
           );
         })}
       </div>
-      {isAdmin && (
+      {canEdit && (
         <div className="mt-4">
           <button
             onClick={handleAddCard}

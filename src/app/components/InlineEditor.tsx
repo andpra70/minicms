@@ -197,7 +197,7 @@ interface InlineEditorProps {
 }
 
 export function InlineEditor({ value, type = 'text', path, className = '', style }: InlineEditorProps) {
-  const { isAdmin, content, updateContent } = useAdmin();
+  const { canEdit, content, updateContent } = useAdmin();
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
@@ -232,7 +232,7 @@ export function InlineEditor({ value, type = 'text', path, className = '', style
     setIsEditing(false);
   };
 
-  if (!isAdmin) {
+  if (!canEdit) {
     return <span className={className} style={style}>{renderMarkdownText(value)}</span>;
   }
 
@@ -323,7 +323,7 @@ interface InlineImageEditorProps {
 }
 
 export function InlineImageEditor({ src, alt, path, className = '', style }: InlineImageEditorProps) {
-  const { isAdmin, content, updateContent } = useAdmin();
+  const { canEdit, content, updateContent } = useAdmin();
   const [isEditing, setIsEditing] = useState(false);
   const [imageValue, setImageValue] = useState(src);
 
@@ -372,7 +372,7 @@ export function InlineImageEditor({ src, alt, path, className = '', style }: Inl
   const embeddedGallery = getEmbeddedGallery(content);
   const displaySrc = resolveImageSource(isEditing ? imageValue : src, content);
 
-  if (!isAdmin) {
+  if (!canEdit) {
     return <img src={resolveImageSource(src, content)} alt={alt} className={className} style={style} />;
   }
 
@@ -523,7 +523,7 @@ export function InlineImagePositionEditor({
   className = '', 
   style 
 }: InlineImagePositionEditorProps) {
-  const { isAdmin, content, updateContent } = useAdmin();
+  const { canEdit, content, updateContent } = useAdmin();
   const [isEditing, setIsEditing] = useState(false);
   const [imageValue, setImageValue] = useState(src);
   const [localPosX, setLocalPosX] = useState(posX);
@@ -628,7 +628,7 @@ export function InlineImagePositionEditor({
   const resolvedCurrentSrc = resolveImageSource(isEditing ? imageValue : src, content);
   const resolvedPreviewSrc = resolveImageSource(imageValue, content);
 
-  if (!isAdmin) {
+  if (!canEdit) {
     return (
       <img 
         src={resolveImageSource(src, content)} 

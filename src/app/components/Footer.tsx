@@ -7,14 +7,14 @@ const DEFAULT_FOOTER = {
 };
 
 export function Footer() {
-  const { isAdmin, site, updateSite } = useAdmin();
+  const { canEdit, site, updateSite } = useAdmin();
   const footer = {
     line1: site?.footer?.line1 || DEFAULT_FOOTER.line1,
     line2: site?.footer?.line2 || DEFAULT_FOOTER.line2,
   };
 
   const handleEditFooterLine = (key: 'line1' | 'line2') => {
-    if (!isAdmin) return;
+    if (!canEdit) return;
     const nextValue = window.prompt('Nuovo testo footer', footer[key]);
     if (!nextValue) return;
     const cleanedValue = nextValue.trim();
@@ -55,7 +55,7 @@ export function Footer() {
         <div className="text-center" style={{ color: 'var(--color-text-secondary)' }}>
           <p className="inline-flex items-center gap-2">
             <span>{footer.line1}</span>
-            {isAdmin && (
+            {canEdit && (
               <button
                 onClick={() => handleEditFooterLine('line1')}
                 className="w-6 h-6 rounded-full inline-flex items-center justify-center"
@@ -72,7 +72,7 @@ export function Footer() {
           </p>
           <p className="mt-2 text-sm inline-flex items-center gap-2">
             <span>{footer.line2}</span>
-            {isAdmin && (
+            {canEdit && (
               <button
                 onClick={() => handleEditFooterLine('line2')}
                 className="w-6 h-6 rounded-full inline-flex items-center justify-center"

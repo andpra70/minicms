@@ -17,15 +17,26 @@ const LOCAL_IMAGE_OPTIONS = [
 ];
 
 const FONT_OPTIONS = [
-  'system-ui, -apple-system, sans-serif',
-  'Inter, sans-serif',
-  'Arial, sans-serif',
-  'Helvetica, sans-serif',
-  'Georgia, serif',
-  '"Times New Roman", serif',
-  'Verdana, sans-serif',
-  '"Trebuchet MS", sans-serif',
-  '"Courier New", monospace',
+  { label: 'Inter', value: 'Inter, sans-serif' },
+  { label: 'Manrope', value: 'Manrope, sans-serif' },
+  { label: 'Outfit', value: 'Outfit, sans-serif' },
+  { label: 'Space Grotesk', value: '"Space Grotesk", sans-serif' },
+  { label: 'Plus Jakarta Sans', value: '"Plus Jakarta Sans", sans-serif' },
+  { label: 'Sora', value: 'Sora, sans-serif' },
+  { label: 'DM Sans', value: '"DM Sans", sans-serif' },
+  { label: 'Urbanist', value: 'Urbanist, sans-serif' },
+  { label: 'Instrument Sans', value: '"Instrument Sans", sans-serif' },
+  { label: 'Syne', value: 'Syne, sans-serif' },
+  { label: 'Archivo', value: 'Archivo, sans-serif' },
+  { label: 'General Sans', value: '"General Sans", sans-serif' },
+  { label: 'IBM Plex Sans', value: '"IBM Plex Sans", sans-serif' },
+  { label: 'Work Sans', value: '"Work Sans", sans-serif' },
+  { label: 'Public Sans', value: '"Public Sans", sans-serif' },
+  { label: 'Epilogue', value: 'Epilogue, sans-serif' },
+  { label: 'Cabinet Grotesk', value: '"Cabinet Grotesk", sans-serif' },
+  { label: 'Mulish', value: 'Mulish, sans-serif' },
+  { label: 'Onest', value: 'Onest, sans-serif' },
+  { label: 'Fraunces', value: 'Fraunces, serif' },
 ];
 
 const DEFAULT_TYPOGRAPHY = {
@@ -650,11 +661,11 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
               <h2>${section.title || ''}</h2>
               <p style="font-size: 1.125rem; line-height: 1.75;">${section.description || ''}</p>
               <div>${parsedEntries || '<span class="badge">Nessuna data configurata</span>'}</div>
+              ${section.notes ? `<p style="font-size: 1.125rem; line-height: 1.75;">${section.notes}</p>` : ''}
             </div>
             <div class="card">
               <div class="card-content">
                 <h3>Date in evidenza</h3>
-                <p>Questa esportazione statica mostra l'elenco delle date configurate.</p>
                 <div>${parsedEntries || '<span class="badge">Nessuna data configurata</span>'}</div>
               </div>
             </div>
@@ -797,7 +808,7 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
 }
 
 export function AdminPanel() {
-  const { isAdmin, setIsAdmin, site, updateSite } = useAdmin();
+  const { isAdmin, setIsAdmin, site, updateSite, editHandlesEnabled, setEditHandlesEnabled } = useAdmin();
   const [showPanel, setShowPanel] = useState(false);
 
   if (!isAdmin) {
@@ -815,20 +826,22 @@ export function AdminPanel() {
 
   return (
     <>
-      <div className="fixed bottom-4 right-4 z-[1300] flex flex-col items-end gap-3">
-        <ContentActions site={site} updateSite={updateSite} />
+      {editHandlesEnabled && (
+        <div className="fixed bottom-4 right-4 z-[1300] flex flex-col items-end gap-3">
+          <ContentActions site={site} updateSite={updateSite} />
 
-        <button
-          onClick={() => setShowPanel((prev) => !prev)}
-          className="p-3 rounded-full shadow-lg transition-transform hover:scale-110"
-          style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
-          title="Tema"
-        >
-          <Paintbrush className="w-5 h-5" />
-        </button>
-      </div>
+          <button
+            onClick={() => setShowPanel((prev) => !prev)}
+            className="p-3 rounded-full shadow-lg transition-transform hover:scale-110"
+            style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
+            title="Tema"
+          >
+            <Paintbrush className="w-5 h-5" />
+          </button>
+        </div>
+      )}
 
-      {showPanel && (
+      {editHandlesEnabled && showPanel && (
         <div
           className="fixed bottom-20 right-4 w-96 max-h-[600px] rounded-lg shadow-2xl z-[1300] overflow-hidden flex flex-col"
           style={{
@@ -876,6 +889,42 @@ export function AdminPanel() {
           </div>
         </div>
       )}
+
+      <div className="fixed bottom-4 left-4 z-[1300]">
+        <button
+          type="button"
+          onClick={() => {
+            const next = !editHandlesEnabled;
+            setEditHandlesEnabled(next);
+            if (!next) {
+              setShowPanel(false);
+            }
+          }}
+          className="flex items-center gap-3 rounded-full px-4 py-3 shadow-lg transition-transform hover:scale-105"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            color: 'var(--color-text)',
+            border: '1px solid var(--color-border)',
+          }}
+          aria-pressed={editHandlesEnabled}
+          aria-label="Abilita o disabilita edit handles"
+        >
+          <span className="text-sm font-medium">Edit Handles</span>
+          <span
+            className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+            style={{
+              backgroundColor: editHandlesEnabled ? 'var(--color-primary)' : 'var(--color-border)',
+            }}
+          >
+            <span
+              className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+              style={{
+                transform: editHandlesEnabled ? 'translateX(22px)' : 'translateX(4px)',
+              }}
+            />
+          </span>
+        </button>
+      </div>
     </>
   );
 }
@@ -891,12 +940,6 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
   const handleProjectNameChange = (value: string) => {
     setProjectName(value);
     localStorage.setItem(PROJECT_NAME_STORAGE_KEY, value);
-  };
-
-  const handleSave = () => {
-    updateSite(site);
-    setError('');
-    closeMenu();
   };
 
   const handleDownload = () => {
@@ -1048,16 +1091,6 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
           <Download className="w-4 h-4" />
           Carica FS
         </button>
-        <button
-          onClick={handleSave}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm font-medium"
-          style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
-          title="Salva"
-          aria-label="Salva"
-        >
-          <Save className="w-4 h-4" />
-          Salva
-        </button>
       </div>
       {error && (
         <div
@@ -1085,6 +1118,36 @@ function ThemeEditor() {
   const [customTheme, setCustomTheme] = useState(theme);
   const [themeName, setThemeName] = useState('');
   const projectFileName = buildProjectFileName(currentProjectName || localStorage.getItem(PROJECT_NAME_STORAGE_KEY) || 'site');
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const typography = { ...DEFAULT_TYPOGRAPHY, ...(customTheme.typography || {}) };
+    const spacing = { ...DEFAULT_SPACING, ...(customTheme.spacing || {}) };
+    Object.entries(customTheme.colors).forEach(([key, value]) => {
+      const cssVar = '--color-' + key.replace(/([A-Z])/g, '-$1').toLowerCase();
+      root.style.setProperty(cssVar, value);
+    });
+    root.style.setProperty('--font-heading', customTheme.fonts.heading);
+    root.style.setProperty('--font-body', customTheme.fonts.body);
+    root.style.setProperty('--font-site-title', customTheme.fonts.heading);
+    root.style.setProperty('--size-site-title', typography.siteTitleSize);
+    root.style.setProperty('--font-nav', customTheme.fonts.body);
+    root.style.setProperty('--size-nav', typography.navSize);
+    root.style.setProperty('--font-h1', customTheme.fonts.heading);
+    root.style.setProperty('--size-h1', typography.h1Size);
+    root.style.setProperty('--font-h2', customTheme.fonts.heading);
+    root.style.setProperty('--size-h2', typography.h2Size);
+    root.style.setProperty('--font-h3', customTheme.fonts.heading);
+    root.style.setProperty('--size-h3', typography.h3Size);
+    root.style.setProperty('--font-body-copy', customTheme.fonts.body);
+    root.style.setProperty('--size-body-copy', typography.bodySize);
+    root.style.setProperty('--container-width', spacing.container);
+    root.style.setProperty('--section-spacing', spacing.section);
+    root.dataset.cmsDensity = spacing.density;
+    root.style.setProperty('--logo-url', `url(${customTheme.logo})`);
+    root.style.setProperty('--header-background', `url(${customTheme.headerBackground})`);
+    root.style.setProperty('--footer-background', `url(${customTheme.footerBackground})`);
+  }, [customTheme]);
 
   const handleColorChange = (key: keyof typeof theme.colors, value: string) => {
     setCustomTheme({
@@ -1129,37 +1192,6 @@ function ThemeEditor() {
     const newMenu = JSON.parse(JSON.stringify(menu));
     newMenu.logo = value;
     updateMenu(newMenu);
-  };
-
-  const handleApply = () => {
-    const root = document.documentElement;
-    const typography = { ...DEFAULT_TYPOGRAPHY, ...(customTheme.typography || {}) };
-    const spacing = { ...DEFAULT_SPACING, ...(customTheme.spacing || {}) };
-    Object.entries(customTheme.colors).forEach(([key, value]) => {
-      const cssVar = '--color-' + key.replace(/([A-Z])/g, '-$1').toLowerCase();
-      root.style.setProperty(cssVar, value);
-    });
-    root.style.setProperty('--font-heading', customTheme.fonts.heading);
-    root.style.setProperty('--font-body', customTheme.fonts.body);
-    root.style.setProperty('--font-site-title', customTheme.fonts.heading);
-    root.style.setProperty('--size-site-title', typography.siteTitleSize);
-    root.style.setProperty('--font-nav', customTheme.fonts.body);
-    root.style.setProperty('--size-nav', typography.navSize);
-    root.style.setProperty('--font-h1', customTheme.fonts.heading);
-    root.style.setProperty('--size-h1', typography.h1Size);
-    root.style.setProperty('--font-h2', customTheme.fonts.heading);
-    root.style.setProperty('--size-h2', typography.h2Size);
-    root.style.setProperty('--font-h3', customTheme.fonts.heading);
-    root.style.setProperty('--size-h3', typography.h3Size);
-    root.style.setProperty('--font-body-copy', customTheme.fonts.body);
-    root.style.setProperty('--size-body-copy', typography.bodySize);
-    root.style.setProperty('--container-width', spacing.container);
-    root.style.setProperty('--section-spacing', spacing.section);
-    root.dataset.cmsDensity = spacing.density;
-    root.style.setProperty('--logo-url', `url(${customTheme.logo})`);
-    root.style.setProperty('--header-background', `url(${customTheme.headerBackground})`);
-    root.style.setProperty('--footer-background', `url(${customTheme.footerBackground})`);
-    alert('Tema applicato! (Temporaneo)');
   };
 
   const handleSave = () => {
@@ -1235,11 +1267,12 @@ function ThemeEditor() {
             backgroundColor: 'var(--color-background)',
             color: 'var(--color-text)',
             border: '1px solid var(--color-border)',
+            fontFamily: customTheme.fonts.body,
           }}
         >
           {FONT_OPTIONS.map((font) => (
-            <option key={font} value={font}>
-              {font}
+            <option key={font.value} value={font.value} style={{ fontFamily: font.value }}>
+              {font.label} - The quick brown fox
             </option>
           ))}
         </select>
@@ -1501,14 +1534,6 @@ function ThemeEditor() {
 
       <div className="flex gap-2">
         <button
-          onClick={handleApply}
-          className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium"
-          style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
-        >
-          <Paintbrush className="w-4 h-4" />
-          Applica
-        </button>
-        <button
           onClick={handleExport}
           className="flex items-center gap-2 px-3 py-2 rounded text-sm"
           style={{
@@ -1548,6 +1573,7 @@ function ThemeEditor() {
           </button>
         </div>
       </div>
+
     </div>
   );
 }

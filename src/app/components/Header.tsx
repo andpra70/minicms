@@ -19,7 +19,7 @@ export function Header() {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, setTheme, availableThemes } = useTheme();
-  const { isAdmin, menu, updateMenu, content, updateContent } = useAdmin();
+  const { isAdmin, canEdit, menu, updateMenu, content, updateContent } = useAdmin();
 
   const menuItems: MenuItem[] = Array.isArray(menu?.items) ? menu.items : [];
 
@@ -56,7 +56,7 @@ export function Header() {
     e: DragEvent<HTMLElement>,
     payload: { level: 'top' | 'child'; parentId?: string; itemId: string }
   ) => {
-    if (!isAdmin) return;
+    if (!canEdit) return;
     setDraggedMenu(payload);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', JSON.stringify(payload));
@@ -234,7 +234,7 @@ export function Header() {
   };
 
   const handleEditRouteLabel = (itemToEdit: MenuItem, parentId?: string) => {
-    if (!isAdmin) return;
+    if (!canEdit) return;
     const nextLabel = window.prompt('Nuova label pagina', itemToEdit.label);
     if (!nextLabel) return;
 
@@ -308,14 +308,14 @@ export function Header() {
               <div
                 key={item.id}
                 className="relative group flex items-center gap-1"
-                draggable={isAdmin}
+                draggable={canEdit}
                 onDragStart={(e) => handleDragStart(e, { level: 'top', itemId: item.id })}
                 onDragEnd={() => setDraggedMenu(null)}
                 onDragOver={(e) => {
-                  if (isAdmin) e.preventDefault();
+                  if (canEdit) e.preventDefault();
                 }}
                 onDrop={(e) => {
-                  if (!isAdmin) return;
+                  if (!canEdit) return;
                   e.preventDefault();
                   const payload = readDragPayload(e);
                   if (payload?.level === 'top') {
@@ -338,7 +338,7 @@ export function Header() {
                   {item.label}{(item.children || []).length > 0 ? ' ▾' : ''}
                 </Link>
 
-                {isAdmin && item.id !== 'home' && (
+                {canEdit && item.id !== 'home' && (
                   <button
                     onClick={() => handleDeleteRoute(item)}
                     className="w-6 h-6 rounded-full inline-flex items-center justify-center"
@@ -353,7 +353,7 @@ export function Header() {
                   </button>
                 )}
 
-                {isAdmin && (
+                {canEdit && (
                   <button
                     onClick={() => handleEditRouteLabel(item)}
                     className="w-6 h-6 rounded-full inline-flex items-center justify-center"
@@ -368,7 +368,7 @@ export function Header() {
                   </button>
                 )}
 
-                {isAdmin && (
+                {canEdit && (
                   <button
                     onClick={() => handleAddSubRoute(item)}
                     className="w-6 h-6 rounded-full inline-flex items-center justify-center"
@@ -398,14 +398,14 @@ export function Header() {
                         <div
                           key={child.id}
                           className="px-3 py-2 flex items-center gap-2"
-                          draggable={isAdmin}
+                          draggable={canEdit}
                           onDragStart={(e) => handleDragStart(e, { level: 'child', parentId: item.id, itemId: child.id })}
                           onDragEnd={() => setDraggedMenu(null)}
                           onDragOver={(e) => {
-                            if (isAdmin) e.preventDefault();
+                            if (canEdit) e.preventDefault();
                           }}
                           onDrop={(e) => {
-                            if (!isAdmin) return;
+                            if (!canEdit) return;
                             e.preventDefault();
                             const payload = readDragPayload(e);
                             if (payload?.level === 'child' && payload.parentId === item.id) {
@@ -427,7 +427,7 @@ export function Header() {
                           >
                             {child.label}
                           </Link>
-                          {isAdmin && (
+                          {canEdit && (
                             <button
                               onClick={() => handleEditRouteLabel(child, item.id)}
                               className="w-6 h-6 rounded-full inline-flex items-center justify-center"
@@ -441,7 +441,7 @@ export function Header() {
                               <Pencil className="w-3 h-3" />
                             </button>
                           )}
-                          {isAdmin && (
+                          {canEdit && (
                             <button
                               onClick={() => handleDeleteRoute(child)}
                               className="w-6 h-6 rounded-full inline-flex items-center justify-center"
@@ -463,7 +463,7 @@ export function Header() {
               </div>
             ))}
 
-            {isAdmin && (
+            {canEdit && (
               <button
                 onClick={handleAddTopRoute}
                 className="px-3 py-2 rounded-lg text-sm inline-flex items-center gap-2"
@@ -538,14 +538,14 @@ export function Header() {
               <div
                 key={item.id}
                 className="space-y-1"
-                draggable={isAdmin}
+                draggable={canEdit}
                 onDragStart={(e) => handleDragStart(e, { level: 'top', itemId: item.id })}
                 onDragEnd={() => setDraggedMenu(null)}
                 onDragOver={(e) => {
-                  if (isAdmin) e.preventDefault();
+                  if (canEdit) e.preventDefault();
                 }}
                 onDrop={(e) => {
-                  if (!isAdmin) return;
+                  if (!canEdit) return;
                   e.preventDefault();
                   const payload = readDragPayload(e);
                   if (payload?.level === 'top') {
@@ -569,7 +569,7 @@ export function Header() {
                   >
                     {item.label}
                   </Link>
-                  {isAdmin && (
+                  {canEdit && (
                     <button
                       onClick={() => handleEditRouteLabel(item)}
                       className="w-7 h-7 rounded-full inline-flex items-center justify-center"
@@ -583,7 +583,7 @@ export function Header() {
                       <Pencil className="w-4 h-4" />
                     </button>
                   )}
-                  {isAdmin && (
+                  {canEdit && (
                     <button
                       onClick={() => handleAddSubRoute(item)}
                       className="w-7 h-7 rounded-full inline-flex items-center justify-center"
@@ -597,7 +597,7 @@ export function Header() {
                       <Plus className="w-4 h-4" />
                     </button>
                   )}
-                  {isAdmin && item.id !== 'home' && (
+                  {canEdit && item.id !== 'home' && (
                     <button
                       onClick={() => handleDeleteRoute(item)}
                       className="w-7 h-7 rounded-full inline-flex items-center justify-center"
@@ -617,14 +617,14 @@ export function Header() {
                   <div
                     key={child.id}
                     className="pl-4 flex items-center gap-2"
-                    draggable={isAdmin}
+                    draggable={canEdit}
                     onDragStart={(e) => handleDragStart(e, { level: 'child', parentId: item.id, itemId: child.id })}
                     onDragEnd={() => setDraggedMenu(null)}
                     onDragOver={(e) => {
-                      if (isAdmin) e.preventDefault();
+                      if (canEdit) e.preventDefault();
                     }}
                     onDrop={(e) => {
-                      if (!isAdmin) return;
+                      if (!canEdit) return;
                       e.preventDefault();
                       const payload = readDragPayload(e);
                       if (payload?.level === 'child' && payload.parentId === item.id) {
@@ -647,7 +647,7 @@ export function Header() {
                     >
                       - {child.label}
                     </Link>
-                    {isAdmin && (
+                    {canEdit && (
                       <button
                         onClick={() => handleEditRouteLabel(child, item.id)}
                         className="w-7 h-7 rounded-full inline-flex items-center justify-center"
@@ -661,7 +661,7 @@ export function Header() {
                         <Pencil className="w-4 h-4" />
                       </button>
                     )}
-                    {isAdmin && (
+                    {canEdit && (
                       <button
                         onClick={() => handleDeleteRoute(child)}
                         className="w-7 h-7 rounded-full inline-flex items-center justify-center"
@@ -680,7 +680,7 @@ export function Header() {
               </div>
             ))}
 
-            {isAdmin && (
+            {canEdit && (
               <button
                 onClick={handleAddTopRoute}
                 className="w-full py-2 px-3 text-left flex items-center gap-2 rounded-lg"

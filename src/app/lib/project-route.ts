@@ -1,5 +1,6 @@
 const PROJECT_QUERY_PARAM = 'project';
 const EDIT_QUERY_PARAM = 'edit';
+const RESERVED_PATH_SEGMENTS = new Set(['minicms']);
 
 function getSearchParamsFromLocation(locationLike: Pick<Location, 'search'> & Partial<Pick<Location, 'hash'>>) {
   const params = new URLSearchParams(locationLike.search);
@@ -29,6 +30,27 @@ export function sanitizeProjectName(value: string) {
   return cleaned || 'site';
 }
 
+function getPathSegments(pathname: string) {
+  return String(pathname || '')
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+function getTrailingPathProjectName(pathname: string) {
+  const segments = getPathSegments(pathname);
+  if (segments.length === 0) {
+    return null;
+  }
+
+  const lastSegment = segments[segments.length - 1];
+  if (!lastSegment || lastSegment.includes('.') || RESERVED_PATH_SEGMENTS.has(lastSegment.toLowerCase())) {
+    return null;
+  }
+
+  return sanitizeProjectName(decodeURIComponent(lastSegment));
+}
+
 export function getProjectNameFromUrl(locationLike: Pick<Location, 'pathname' | 'search'> = window.location) {
   const searchParams = getSearchParamsFromLocation(locationLike);
   const queryProject = searchParams.get(PROJECT_QUERY_PARAM);
@@ -39,6 +61,11 @@ export function getProjectNameFromUrl(locationLike: Pick<Location, 'pathname' | 
   const pathMatch = locationLike.pathname.match(/\/project\/([^/]+)/i);
   if (pathMatch?.[1]) {
     return sanitizeProjectName(decodeURIComponent(pathMatch[1]));
+  }
+
+  const trailingProject = getTrailingPathProjectName(locationLike.pathname);
+  if (trailingProject) {
+    return trailingProject;
   }
 
   return null;
@@ -54,6 +81,22 @@ export function buildProjectFileName(projectName: string) {
 
 export function setProjectUrl(projectName: string) {
   const url = new URL(window.location.href);
-  url.searchParams.set(PROJECT_QUERY_PARAM, sanitizeProjectName(projectName));
+  const normalizedProjectName = sanitizeProjectName(projectName);
+  const segments = getPathSegments(url.pathname);
+
+  if (url.pathname.match(/\/project\/[^/]+/i)) {
+    url.pathname = url.pathname.replace(/\/project\/[^/]+/i, `/project/${normalizedProjectName}`);
+  } else if (
+    !url.searchParams.has(PROJECT_QUERY_PARAM) &&
+    segments.length >= 1 &&
+    !segments[segments.length - 1].includes('.') &&
+    !RESERVED_PATH_SEGMENTS.has(segments[segments.length - 1].toLowerCase())
+  ) {
+    segments[segments.length - 1] = normalizedProjectName;
+    url.pathname = `/${segments.join('/')}`;
+  } else {
+    url.searchParams.set(PROJECT_QUERY_PARAM, normalizedProjectName);
+  }
+
   window.history.replaceState({}, '', url.toString());
 }

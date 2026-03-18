@@ -93,6 +93,40 @@ function countProjectImages(node: any): number {
   return total;
 }
 
+function pruneUnusedGallery(site: any) {
+  const nextSite = JSON.parse(JSON.stringify(site || {}));
+  const usedGalleryIds = new Set<string>();
+
+  const visit = (value: any, key?: string) => {
+    if (Array.isArray(value)) {
+      if (key === 'gallery') {
+        return;
+      }
+      value.forEach((item) => visit(item));
+      return;
+    }
+
+    if (!value || typeof value !== 'object') {
+      if (typeof value === 'string' && value.startsWith('gallery:')) {
+        usedGalleryIds.add(value.slice('gallery:'.length));
+      }
+      return;
+    }
+
+    Object.entries(value).forEach(([entryKey, entryValue]) => {
+      visit(entryValue, entryKey);
+    });
+  };
+
+  visit(nextSite);
+
+  if (Array.isArray(nextSite.gallery)) {
+    nextSite.gallery = nextSite.gallery.filter((item: any) => item?.id && usedGalleryIds.has(item.id));
+  }
+
+  return nextSite;
+}
+
 interface ThemeImageDropFieldProps {
   label: string;
   value: string;
@@ -1122,7 +1156,8 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
 
   const handleDownload = () => {
     setProjectUrl(projectName);
-    const blob = new Blob([JSON.stringify(site, null, 2)], { type: 'application/json' });
+    const cleanedSite = pruneUnusedGallery(site);
+    const blob = new Blob([JSON.stringify(cleanedSite, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1134,7 +1169,9 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
   const handleSaveToFileserver = async () => {
     try {
       setProjectUrl(projectName);
-      await saveTextToFileserver(fileName, JSON.stringify(site, null, 2));
+      const cleanedSite = pruneUnusedGallery(site);
+      updateSite(cleanedSite);
+      await saveTextToFileserver(fileName, JSON.stringify(cleanedSite, null, 2));
       setError('');
       closeMenu();
     } catch (error) {

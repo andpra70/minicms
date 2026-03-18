@@ -136,7 +136,7 @@ export function AdminProvider({
   });
   const [editHandlesEnabled, setEditHandlesEnabledState] = useState<boolean>(() => {
     const raw = localStorage.getItem('cms-edit-handles-enabled');
-    return raw === null ? true : raw === 'true';
+    return raw === null ? false : raw === 'true';
   });
 
   const [site, setSite] = useState<any>(() => bootState.site);

@@ -3,7 +3,7 @@ import { Edit2, Check, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAdmin } from '@/contexts/AdminContext';
 import { resolveAppAssetUrl } from '@/app/lib/urls';
-import { optimizeImageFile } from '@/app/lib/image-upload';
+import { isImageFile, optimizeImageFile } from '@/app/lib/image-upload';
 
 const LOCAL_IMAGE_GALLERY = [
   'img/2.webp',
@@ -215,6 +215,23 @@ async function addOptimizedImageToGallery(file: File, content: any) {
   return `${GALLERY_REF_PREFIX}${id}`;
 }
 
+async function applyOptimizedImageToPath(file: File, sourceContent: any, path: string[], updateContent: (newContent: any) => void) {
+  if (!isImageFile(file)) {
+    throw new Error('Seleziona una immagine valida.');
+  }
+
+  const nextContent = JSON.parse(JSON.stringify(sourceContent));
+  let current = nextContent;
+  for (let i = 0; i < path.length - 1; i++) {
+    current = current[path[i]];
+  }
+
+  const dataUrl = await optimizeImageFile(file);
+  current[path[path.length - 1]] = ensureImageReference(dataUrl, nextContent);
+  updateContent(nextContent);
+  return current[path[path.length - 1]];
+}
+
 interface EmbeddedGalleryDropzoneProps {
   onSelectRef: (ref: string) => void;
 }
@@ -225,7 +242,7 @@ function EmbeddedGalleryDropzone({ onSelectRef }: EmbeddedGalleryDropzoneProps) 
   const [isOver, setIsOver] = useState(false);
 
   const processFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    if (!isImageFile(file)) {
       alert('Seleziona una immagine valida.');
       return;
     }
@@ -255,9 +272,10 @@ function EmbeddedGalleryDropzone({ onSelectRef }: EmbeddedGalleryDropzoneProps) 
   const handleDrop = async (event: React.DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
-    if (file) {
+    if (isImageFile(file)) {
       await processFile(file);
     }
+    setIsOver(false);
   };
 
   return (
@@ -489,6 +507,7 @@ export function InlineImageEditor({ src, alt, path, className = '', style }: Inl
   const { canEdit, content, updateContent } = useAdmin();
   const [isEditing, setIsEditing] = useState(false);
   const [imageValue, setImageValue] = useState(src);
+  const [isDropOver, setIsDropOver] = useState(false);
 
   const handleSave = () => {
     const newContent = JSON.parse(JSON.stringify(content));
@@ -534,13 +553,51 @@ export function InlineImageEditor({ src, alt, path, className = '', style }: Inl
 
   const displaySrc = resolveImageSource(isEditing ? imageValue : src, content);
 
+  const handleDirectDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDropOver(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!isImageFile(file)) {
+      return;
+    }
+    try {
+      const nextValue = await applyOptimizedImageToPath(file, content, path, updateContent);
+      setImageValue(nextValue);
+      setIsEditing(false);
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : 'Impossibile sostituire l\'immagine.');
+    }
+  };
+
   if (!canEdit) {
     return <img src={resolveImageSource(src, content)} alt={alt} className={className} style={style} />;
   }
 
   return (
-    <div className="relative group">
+    <div
+      className="relative group"
+      onDragOver={(event) => {
+        event.preventDefault();
+        setIsDropOver(true);
+      }}
+      onDragLeave={() => setIsDropOver(false)}
+      onDrop={handleDirectDrop}
+    >
       <img src={displaySrc} alt={alt} className={className} style={style} />
+      {isDropOver && !isEditing && (
+        <div
+          className="absolute inset-0 flex items-center justify-center rounded"
+          style={{
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            border: '2px dashed var(--color-primary)',
+            color: '#ffffff',
+            zIndex: 15,
+          }}
+        >
+          Drop per sostituire
+        </div>
+      )}
       
       {!isEditing && (
         <button
@@ -672,6 +729,7 @@ export function InlineImagePositionEditor({
   const clampScale = (value: number) => Math.max(10, Math.min(200, value));
   const [localScale, setLocalScale] = useState(clampScale(scale));
   const [isDragging, setIsDragging] = useState(false);
+  const [isDropOver, setIsDropOver] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
 
   const handleSave = () => {
@@ -768,6 +826,23 @@ export function InlineImagePositionEditor({
   const resolvedCurrentSrc = resolveImageSource(isEditing ? imageValue : src, content);
   const resolvedPreviewSrc = resolveImageSource(imageValue, content);
 
+  const handleDirectDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDropOver(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!isImageFile(file)) {
+      return;
+    }
+    try {
+      const nextValue = await applyOptimizedImageToPath(file, content, path, updateContent);
+      setImageValue(nextValue);
+      setIsEditing(false);
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : 'Impossibile sostituire l\'immagine.');
+    }
+  };
+
   if (!canEdit) {
     return (
       <img 
@@ -785,7 +860,15 @@ export function InlineImagePositionEditor({
   }
 
   return (
-    <div className="relative group">
+    <div
+      className="relative group"
+      onDragOver={(event) => {
+        event.preventDefault();
+        setIsDropOver(true);
+      }}
+      onDragLeave={() => setIsDropOver(false)}
+      onDrop={handleDirectDrop}
+    >
       <img 
         src={resolvedCurrentSrc} 
         alt={alt} 
@@ -797,6 +880,19 @@ export function InlineImagePositionEditor({
           transformOrigin: `${isEditing ? localPosX : posX}% ${isEditing ? localPosY : posY}%`,
         }} 
       />
+      {isDropOver && !isEditing && (
+        <div
+          className="absolute inset-0 flex items-center justify-center rounded"
+          style={{
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            border: '2px dashed var(--color-primary)',
+            color: '#ffffff',
+            zIndex: 15,
+          }}
+        >
+          Drop per sostituire
+        </div>
+      )}
       
       {!isEditing && (
         <button

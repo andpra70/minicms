@@ -6,7 +6,7 @@ import { themes } from '@/themes/themes';
 import { resolveAppAssetUrl } from '@/app/lib/urls';
 import { loadTextFromFileserver, saveTextToFileserver } from '@/app/lib/fileserver';
 import { buildProjectFileName, hasEditModeFromUrl, setProjectUrl } from '@/app/lib/project-route';
-import { optimizeImageFile } from '@/app/lib/image-upload';
+import { isImageFile, optimizeImageFile } from '@/app/lib/image-upload';
 
 const LOCAL_IMAGE_OPTIONS = [
   'img/2.webp',
@@ -57,6 +57,42 @@ const DEFAULT_SPACING = {
 
 const PROJECT_NAME_STORAGE_KEY = 'cms-project-name';
 
+function formatProjectBytes(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function countProjectImages(node: any): number {
+  let total = 0;
+  const visit = (value: any) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== 'object') {
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (
+          normalized.startsWith('data:image/') ||
+          normalized.startsWith('gallery:') ||
+          /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)(\?.*)?$/i.test(normalized)
+        ) {
+          total += 1;
+        }
+      }
+      return;
+    }
+    Object.values(value).forEach(visit);
+  };
+  visit(node);
+  return total;
+}
+
 interface ThemeImageDropFieldProps {
   label: string;
   value: string;
@@ -78,7 +114,7 @@ function ThemeImageDropField({
   const [isUploading, setIsUploading] = useState(false);
 
   const handleFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    if (!isImageFile(file)) {
       alert('Seleziona una immagine valida.');
       return;
     }
@@ -123,9 +159,10 @@ function ThemeImageDropField({
         onDrop={async (event) => {
           event.preventDefault();
           const file = event.dataTransfer.files?.[0];
-          if (file) {
+          if (isImageFile(file)) {
             await handleFile(file);
           }
+          setIsOver(false);
         }}
         className="block p-3 rounded cursor-pointer transition-colors"
         style={{
@@ -949,9 +986,13 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
 }
 
 export function AdminPanel() {
-  const { isAdmin, site, updateSite, editHandlesEnabled, setEditHandlesEnabled } = useAdmin();
+  const { isAdmin, site, updateSite, editHandlesEnabled, setEditHandlesEnabled, currentProjectName } = useAdmin();
   const [showPanel, setShowPanel] = useState(false);
   const canShowEditHandlesToggle = hasEditModeFromUrl();
+  const projectName = currentProjectName || localStorage.getItem(PROJECT_NAME_STORAGE_KEY) || 'site';
+  const projectSize = formatProjectBytes(new Blob([JSON.stringify(site)]).size);
+  const pageCount = Object.keys(site?.pages || {}).length;
+  const imageCount = countProjectImages(site);
 
   if (!isAdmin && !canShowEditHandlesToggle) {
     return null;
@@ -1024,7 +1065,7 @@ export function AdminPanel() {
                 setShowPanel(false);
               }
             }}
-            className="flex items-center gap-3 rounded-full px-4 py-3 shadow-lg transition-transform hover:scale-105"
+            className="flex items-center gap-3 rounded-2xl px-4 py-3 shadow-lg transition-transform hover:scale-105"
             style={{
               backgroundColor: 'var(--color-surface)',
               color: 'var(--color-text)',
@@ -1033,7 +1074,15 @@ export function AdminPanel() {
             aria-pressed={editHandlesEnabled}
             aria-label="Abilita o disabilita edit handles"
           >
-            <span className="text-sm font-medium">Edit Handles</span>
+            <span className="flex flex-col items-start leading-tight">
+              <span className="text-sm font-medium">Edit Handles</span>
+              <span className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                {projectName} · {projectSize}
+              </span>
+              <span className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                {pageCount} pagine · {imageCount} immagini
+              </span>
+            </span>
             <span
               className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
               style={{
@@ -1065,6 +1114,10 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
   const handleProjectNameChange = (value: string) => {
     setProjectName(value);
     localStorage.setItem(PROJECT_NAME_STORAGE_KEY, value);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('project') || /\/project\/[^/]+/i.test(url.pathname)) {
+      setProjectUrl(value);
+    }
   };
 
   const handleDownload = () => {
@@ -1168,11 +1221,11 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
             color: 'var(--color-text)',
             border: '1px solid var(--color-border)',
           }}
-          title="Scarica"
-          aria-label="Scarica"
+          title="Esporta"
+          aria-label="Esporta"
         >
           <Download className="w-4 h-4" />
-          Scarica
+          Esporta
         </button>
         <label
           className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm cursor-pointer"
@@ -1181,11 +1234,11 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
             color: 'var(--color-text)',
             border: '1px solid var(--color-border)',
           }}
-          title="Carica JSON"
-          aria-label="Carica JSON"
+          title="Importa JSON"
+          aria-label="Importa JSON"
         >
           <Upload className="w-4 h-4" />
-          Carica
+          Importa
           <input type="file" accept=".json" onChange={handleUpload} className="hidden" />
         </label>
         <button

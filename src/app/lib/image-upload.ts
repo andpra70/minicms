@@ -1,6 +1,14 @@
 const DEFAULT_MAX_IMAGE_BYTES = 300 * 1024;
 const MAX_DIMENSION_STEPS = [2200, 1800, 1600, 1400, 1280, 1120, 960, 820, 720, 640];
 const QUALITY_STEPS = [0.9, 0.82, 0.74, 0.66, 0.58, 0.5, 0.42];
+const IMAGE_EXTENSION_REGEX = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i;
+
+export function isImageFile(file: File | null | undefined) {
+  if (!file) {
+    return false;
+  }
+  return file.type.startsWith('image/') || IMAGE_EXTENSION_REGEX.test(file.name || '');
+}
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -65,7 +73,7 @@ export async function imageFileToDataUrl(file: File) {
 }
 
 export async function optimizeImageFile(file: File, maxBytes = DEFAULT_MAX_IMAGE_BYTES) {
-  if (!file.type.startsWith('image/')) {
+  if (!isImageFile(file)) {
     throw new Error('Il file selezionato non e una immagine.');
   }
 
@@ -82,7 +90,10 @@ export async function optimizeImageFile(file: File, maxBytes = DEFAULT_MAX_IMAGE
   }
 
   let bestBlob: Blob | null = null;
-  const candidateTypes = file.type === 'image/png' ? ['image/webp', 'image/jpeg', 'image/png'] : ['image/webp', 'image/jpeg'];
+  const candidateTypes =
+    file.type === 'image/png' || /\.png$/i.test(file.name)
+      ? ['image/webp', 'image/jpeg', 'image/png']
+      : ['image/webp', 'image/jpeg'];
 
   for (const maxDimension of MAX_DIMENSION_STEPS) {
     const nextSize = scaleSize(image.naturalWidth, image.naturalHeight, maxDimension);

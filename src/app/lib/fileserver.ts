@@ -2,6 +2,7 @@ const REMOTE_FILESERVER_BASE = 'https://zanotti.iliadboxos.it:55443/fileserver';
 const FILESERVER_STORAGE_KEY = 'cms-fileserver-path';
 
 interface FileserverClient {
+  listDirectory: (path: string) => Promise<{ currentPath?: string; parentPath?: string; items?: any[] }>;
   saveFileContent: (path: string, content: string) => Promise<unknown>;
   uploadFiles: (path: string, files: File[], onProgress?: (progress: number) => void) => Promise<unknown>;
 }
@@ -95,6 +96,13 @@ function getClient(api: FileserverApiGlobal | null) {
   return api.createClient({ apiBase: getFileserverApiBase() });
 }
 
+export interface FileserverListItem {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  size?: number;
+}
+
 function splitPath(path: string) {
   const normalized = String(path || '').replace(/^\/+|\/+$/g, '');
   const segments = normalized.split('/').filter(Boolean);
@@ -133,4 +141,18 @@ export async function saveTextToFileserver(path: string, content: string) {
 
 export async function loadTextFromFileserver(path: string) {
   return fetchRawFileText(path);
+}
+
+export async function listFileserverDirectory(path: string) {
+  const api = await ensureFileserverApiLoaded();
+  const client = getClient(api);
+  const result = await client.listDirectory(path);
+  const items = Array.isArray(result?.items) ? result.items : [];
+
+  return items.map((item: any) => ({
+    name: String(item?.name || item?.filename || item?.basename || ''),
+    path: String(item?.path || item?.fullPath || item?.relativePath || ''),
+    isDirectory: Boolean(item?.isDirectory || item?.type === 'directory' || item?.kind === 'directory'),
+    size: typeof item?.size === 'number' ? item.size : undefined,
+  })) as FileserverListItem[];
 }

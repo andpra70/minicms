@@ -76,7 +76,7 @@ export function hasEditModeFromUrl(locationLike: Pick<Location, 'search'> & Part
 }
 
 export function buildProjectFileName(projectName: string) {
-  return `${sanitizeProjectName(projectName)}.json`;
+  return `sites/${sanitizeProjectName(projectName)}.json`;
 }
 
 export function setProjectUrl(projectName: string) {
@@ -98,5 +98,20 @@ export function setProjectUrl(projectName: string) {
     url.searchParams.set(PROJECT_QUERY_PARAM, normalizedProjectName);
   }
 
+  window.history.replaceState({}, '', url.toString());
+}
+
+export function setProjectPathUrl(projectName: string) {
+  const url = new URL(window.location.href);
+  const normalizedProjectName = sanitizeProjectName(projectName);
+  const segments = getPathSegments(url.pathname).filter(
+    (segment) => !RESERVED_PATH_SEGMENTS.has(segment.toLowerCase()) && !segment.includes('.')
+  );
+  const baseSegments = getPathSegments(url.pathname).filter((segment) =>
+    RESERVED_PATH_SEGMENTS.has(segment.toLowerCase())
+  );
+
+  url.pathname = `/${[...baseSegments, normalizedProjectName].join('/')}`;
+  url.searchParams.delete(PROJECT_QUERY_PARAM);
   window.history.replaceState({}, '', url.toString());
 }

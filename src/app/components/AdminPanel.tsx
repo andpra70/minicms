@@ -7,6 +7,7 @@ import { resolveAppAssetUrl } from '@/app/lib/urls';
 import { loadTextFromFileserver, saveTextToFileserver } from '@/app/lib/fileserver';
 import { buildProjectFileName, hasEditModeFromUrl, setProjectUrl } from '@/app/lib/project-route';
 import { isImageFile, optimizeImageFile } from '@/app/lib/image-upload';
+import { buildYouTubeEmbedUrl } from '@/app/lib/youtube';
 
 const LOCAL_IMAGE_OPTIONS = [
   'img/2.webp',
@@ -887,6 +888,38 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
     `;
   }
 
+  function renderYouTubeSection(section: any, pageId: string, sectionIndex: number) {
+    const embedUrl = buildYouTubeEmbedUrl(section.videoUrl || '');
+
+    return `
+      <section class="page" id="${pageId}">
+        <div class="container">
+          <div style="display:grid;gap:1.5rem;">
+            <div>
+              <h2>${section.title || ''}</h2>
+              ${section.description ? `<p style="font-size: 1.125rem; line-height: 1.75;">${section.description}</p>` : ''}
+            </div>
+            <div class="card">
+              ${
+                embedUrl
+                  ? `<div style="position:relative;width:100%;padding-top:56.25%;">
+                      <iframe
+                        src="${embedUrl}"
+                        title="${escapeHtml(section.title || 'Video YouTube')}"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowfullscreen
+                        style="position:absolute;inset:0;width:100%;height:100%;border:0;"
+                      ></iframe>
+                    </div>`
+                  : '<div class="card-content"><p>Nessun video YouTube valido configurato.</p></div>'
+              }
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
   function renderSection(section: any, pageId: string, sectionIndex: number) {
     switch (section.type) {
       case 'hero':
@@ -905,6 +938,8 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
         return renderPlaceSection(section, pageId, sectionIndex);
       case 'calendar':
         return renderCalendarSection(section, pageId, sectionIndex);
+      case 'youtube':
+        return renderYouTubeSection(section, pageId, sectionIndex);
       default:
         return '';
     }

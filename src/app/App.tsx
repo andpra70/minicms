@@ -5,10 +5,15 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { PageLayout } from './components/PageLayout';
 import { AdminPanel } from './components/AdminPanel';
+import { ProjectPicker } from './components/ProjectPicker';
 import { getProjectNameFromUrl } from '@/app/lib/project-route';
 
 export default function App() {
   const projectName = getProjectNameFromUrl();
+
+  if (!projectName) {
+    return <ProjectPicker />;
+  }
 
   return (
     <AdminProvider key={projectName || 'default-project'} projectName={projectName}>

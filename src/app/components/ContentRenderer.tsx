@@ -6,6 +6,7 @@ import { useAdmin } from '@/contexts/AdminContext';
 import { geocodeAddress, loadLeaflet } from '@/app/lib/leaflet';
 import { Calendar } from './ui/calendar';
 import { parseCalendarInput } from '@/app/lib/calendar-highlights';
+import { buildYouTubeEmbedUrl } from '@/app/lib/youtube';
 
 interface Section {
   type: string;
@@ -202,7 +203,7 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
             Aggiungi una nuova sezione
           </p>
           <div className="flex flex-wrap gap-2">
-            {['hero', 'content', 'features', 'services-list', 'blog-list', 'contact-info', 'place', 'calendar'].map((type) => (
+            {['hero', 'content', 'features', 'services-list', 'blog-list', 'contact-info', 'place', 'calendar', 'youtube'].map((type) => (
               <button
                 key={type}
                 onClick={() => addSection(type)}
@@ -234,6 +235,7 @@ function getSectionLabel(type: string) {
     'contact-info': 'Contatti',
     place: 'Luogo',
     calendar: 'Calendario',
+    youtube: 'YouTube',
   };
   return labels[type] || type;
 }
@@ -294,6 +296,13 @@ function createSectionTemplate(type: string) {
         description: 'Date importanti in evidenza.',
         entries: '2026-03-20\n2026-03-24..2026-03-27\n2026-04-02',
         notes: 'Le date evidenziate indicano aperture speciali ed eventi.',
+      };
+    case 'youtube':
+      return {
+        type: 'youtube',
+        title: 'Video YouTube',
+        description: 'Presentazione video incorporata.',
+        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
       };
     case 'content':
     default:
@@ -380,9 +389,88 @@ function SectionRenderer({ section, pageId, sectionIndex }: { section: Section; 
       return <PlaceSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
     case 'calendar':
       return <CalendarSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+    case 'youtube':
+      return <YouTubeSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
     default:
       return null;
   }
+}
+
+function YouTubeSection({ title, description, videoUrl, pageId, sectionIndex }: any) {
+  const { canEdit } = useAdmin();
+  const embedUrl = buildYouTubeEmbedUrl(videoUrl);
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h2
+          className="text-3xl font-bold"
+          style={{
+            color: 'var(--color-text)',
+            fontFamily: 'var(--font-h2)',
+            fontSize: 'var(--size-h2)',
+          }}
+        >
+          <InlineEditor
+            value={title}
+            path={['pages', pageId, 'sections', sectionIndex, 'title']}
+          />
+        </h2>
+        <p
+          style={{
+            color: 'var(--color-text-secondary)',
+            fontFamily: 'var(--font-body-copy)',
+            fontSize: 'var(--size-body-copy)',
+          }}
+        >
+          <InlineEditor
+            value={description}
+            type="textarea"
+            path={['pages', pageId, 'sections', sectionIndex, 'description']}
+          />
+        </p>
+        <div>
+          <div className="mb-2 text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+            URL o ID YouTube
+          </div>
+          <InlineEditor
+            value={videoUrl}
+            path={['pages', pageId, 'sections', sectionIndex, 'videoUrl']}
+          />
+          {canEdit && (
+            <div className="mt-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+              Supporta URL `youtube.com`, `youtu.be`, `shorts` oppure ID diretto del video.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div
+        className="rounded-lg overflow-hidden"
+        style={{
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        {embedUrl ? (
+          <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+            <iframe
+              src={embedUrl}
+              title={title || 'Video YouTube'}
+              className="absolute inset-0 w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            />
+          </div>
+        ) : (
+          <div className="px-6 py-12 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+            Inserisci un URL o ID YouTube valido per mostrare il video.
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function CalendarSection({ title, description, entries, notes, pageId, sectionIndex }: any) {

@@ -77,6 +77,10 @@ export async function optimizeImageFile(file: File, maxBytes = DEFAULT_MAX_IMAGE
     throw new Error('Il file selezionato non e una immagine.');
   }
 
+  if (file.type === 'image/gif' || /\.gif$/i.test(file.name || '')) {
+    return readFileAsDataUrl(file);
+  }
+
   if (file.size <= maxBytes) {
     return readFileAsDataUrl(file);
   }

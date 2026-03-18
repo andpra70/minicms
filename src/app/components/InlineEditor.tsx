@@ -3,6 +3,7 @@ import { Edit2, Check, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAdmin } from '@/contexts/AdminContext';
 import { resolveAppAssetUrl } from '@/app/lib/urls';
+import { optimizeImageFile } from '@/app/lib/image-upload';
 
 const LOCAL_IMAGE_GALLERY = [
   'img/2.webp',
@@ -48,6 +49,31 @@ function ensureImageReference(value: string, targetContent: any) {
   return value;
 }
 
+function removeEmbeddedGalleryItem(targetContent: any, imageId: string) {
+  const ref = `${GALLERY_REF_PREFIX}${imageId}`;
+  const visit = (node: any) => {
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+    Object.keys(node).forEach((key) => {
+      if (key === 'gallery' && Array.isArray(node[key])) {
+        node[key] = node[key].filter((item: any) => item?.id !== imageId);
+        return;
+      }
+      if (node[key] === ref) {
+        node[key] = '';
+        return;
+      }
+      visit(node[key]);
+    });
+  };
+  visit(targetContent);
+}
+
 function getDisplayValue(value: string) {
   if (isGalleryRef(value)) {
     return value;
@@ -64,15 +90,6 @@ function getGalleryLabel(item: any) {
     return item?.id || 'image';
   }
   return rawLabel.length > 80 ? `${rawLabel.slice(0, 80)}...` : rawLabel;
-}
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 const INLINE_MARKDOWN_REGEX =
@@ -186,6 +203,152 @@ function renderMarkdownText(value: string) {
     return value;
   }
   return parts;
+}
+
+async function addOptimizedImageToGallery(file: File, content: any) {
+  const dataUrl = await optimizeImageFile(file);
+  if (!Array.isArray(content.gallery)) {
+    content.gallery = [];
+  }
+  const id = nextGalleryId(content);
+  content.gallery.push({ id, name: file.name || `upload-${new Date().toISOString()}`, data: dataUrl });
+  return `${GALLERY_REF_PREFIX}${id}`;
+}
+
+interface EmbeddedGalleryDropzoneProps {
+  onSelectRef: (ref: string) => void;
+}
+
+function EmbeddedGalleryDropzone({ onSelectRef }: EmbeddedGalleryDropzoneProps) {
+  const { content, updateContent } = useAdmin();
+  const [isUploading, setIsUploading] = useState(false);
+  const [isOver, setIsOver] = useState(false);
+
+  const processFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Seleziona una immagine valida.');
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const nextContent = JSON.parse(JSON.stringify(content));
+      const ref = await addOptimizedImageToGallery(file, nextContent);
+      updateContent(nextContent);
+      onSelectRef(ref);
+    } catch (error) {
+      console.error(error);
+      alert('Impossibile importare l\'immagine.');
+    } finally {
+      setIsUploading(false);
+      setIsOver(false);
+    }
+  };
+
+  const handleInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      await processFile(file);
+    }
+    event.target.value = '';
+  };
+
+  const handleDrop = async (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files?.[0];
+    if (file) {
+      await processFile(file);
+    }
+  };
+
+  return (
+    <label
+      onDragOver={(event) => {
+        event.preventDefault();
+        setIsOver(true);
+      }}
+      onDragLeave={() => setIsOver(false)}
+      onDrop={handleDrop}
+      className="block w-full p-3 rounded text-sm cursor-pointer transition-colors"
+      style={{
+        backgroundColor: isOver ? 'color-mix(in srgb, var(--color-primary) 12%, var(--color-surface) 88%)' : 'var(--color-background)',
+        color: 'var(--color-text)',
+        border: `1px dashed ${isOver ? 'var(--color-primary)' : 'var(--color-border)'}`,
+      }}
+    >
+      <div className="font-medium">Drop immagine nella gallery</div>
+      <div className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+        {isUploading ? 'Ottimizzazione in corso...' : 'Trascina un file o clicca per importarlo. Se supera 300 KB viene ridimensionato.'}
+      </div>
+      <input type="file" accept="image/*" onChange={handleInputChange} className="hidden" />
+    </label>
+  );
+}
+
+interface EmbeddedGalleryGridProps {
+  content: any;
+  selectedValue: string;
+  onSelectRef: (ref: string) => void;
+  onDeleteRef?: (ref: string) => void;
+}
+
+function EmbeddedGalleryGrid({ content, selectedValue, onSelectRef, onDeleteRef }: EmbeddedGalleryGridProps) {
+  const { updateContent } = useAdmin();
+  const embeddedGallery = getEmbeddedGallery(content);
+
+  if (embeddedGallery.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+        Gallery embedded (base64)
+      </div>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        {embeddedGallery.map((item: any) => {
+          const ref = `${GALLERY_REF_PREFIX}${item.id}`;
+          const galleryLabel = getGalleryLabel(item);
+          return (
+            <div key={item.id} className="relative">
+              <button
+                type="button"
+                onClick={() => onSelectRef(ref)}
+                className="h-16 w-full rounded overflow-hidden"
+                style={{
+                  border: selectedValue === ref ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-background)',
+                }}
+                title={galleryLabel}
+              >
+                <img src={item.data} alt={galleryLabel} className="w-full h-full object-cover" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextContent = JSON.parse(JSON.stringify(content));
+                  removeEmbeddedGalleryItem(nextContent, item.id);
+                  updateContent(nextContent);
+                  if (selectedValue === ref) {
+                    onDeleteRef?.(ref);
+                  }
+                }}
+                className="absolute top-1 right-1 w-5 h-5 rounded-full text-xs leading-none"
+                style={{
+                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                }}
+                title="Elimina immagine"
+                aria-label={`Elimina ${galleryLabel}`}
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 interface InlineEditorProps {
@@ -357,7 +520,7 @@ export function InlineImageEditor({ src, alt, path, className = '', style }: Inl
         if (imageType) {
           const blob = await item.getType(imageType);
           const file = new File([blob], 'clipboard-image', { type: imageType });
-          const dataUrl = await fileToDataUrl(file);
+          const dataUrl = await optimizeImageFile(file);
           setImageValue(dataUrl);
           return;
         }
@@ -369,7 +532,6 @@ export function InlineImageEditor({ src, alt, path, className = '', style }: Inl
     }
   };
 
-  const embeddedGallery = getEmbeddedGallery(content);
   const displaySrc = resolveImageSource(isEditing ? imageValue : src, content);
 
   if (!canEdit) {
@@ -417,6 +579,7 @@ export function InlineImageEditor({ src, alt, path, className = '', style }: Inl
             >
               Incolla da clipboard
             </button>
+            <EmbeddedGalleryDropzone onSelectRef={setImageValue} />
             <div className="space-y-2">
               <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                 Gallery locale (/public/img)
@@ -439,34 +602,12 @@ export function InlineImageEditor({ src, alt, path, className = '', style }: Inl
                 ))}
               </div>
             </div>
-            {embeddedGallery.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                  Gallery embedded (base64)
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {embeddedGallery.map((item: any) => {
-                    const ref = `${GALLERY_REF_PREFIX}${item.id}`;
-                    const galleryLabel = getGalleryLabel(item);
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setImageValue(ref)}
-                        className="h-16 rounded overflow-hidden"
-                        style={{
-                          border: imageValue === ref ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                          backgroundColor: 'var(--color-background)',
-                        }}
-                        title={galleryLabel}
-                      >
-                        <img src={item.data} alt={galleryLabel} className="w-full h-full object-cover" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            <EmbeddedGalleryGrid
+              content={content}
+              selectedValue={imageValue}
+              onSelectRef={setImageValue}
+              onDeleteRef={() => setImageValue('')}
+            />
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
@@ -589,7 +730,7 @@ export function InlineImagePositionEditor({
         if (imageType) {
           const blob = await item.getType(imageType);
           const file = new File([blob], 'clipboard-image', { type: imageType });
-          const dataUrl = await fileToDataUrl(file);
+          const dataUrl = await optimizeImageFile(file);
           setImageValue(dataUrl);
           return;
         }
@@ -624,7 +765,6 @@ export function InlineImagePositionEditor({
     setIsDragging(false);
   };
 
-  const embeddedGallery = getEmbeddedGallery(content);
   const resolvedCurrentSrc = resolveImageSource(isEditing ? imageValue : src, content);
   const resolvedPreviewSrc = resolveImageSource(imageValue, content);
 
@@ -701,6 +841,7 @@ export function InlineImagePositionEditor({
             >
               Incolla da clipboard
             </button>
+            <EmbeddedGalleryDropzone onSelectRef={setImageValue} />
             <div className="space-y-2">
               <label className="block text-sm font-medium" style={{ color: 'var(--color-text)' }}>
                 Gallery locale (/public/img)
@@ -723,34 +864,12 @@ export function InlineImagePositionEditor({
                 ))}
               </div>
             </div>
-            {embeddedGallery.length > 0 && (
-              <div className="space-y-2">
-                <label className="block text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-                  Gallery embedded (base64)
-                </label>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                  {embeddedGallery.map((item: any) => {
-                    const ref = `${GALLERY_REF_PREFIX}${item.id}`;
-                    const galleryLabel = getGalleryLabel(item);
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setImageValue(ref)}
-                        className="h-16 rounded overflow-hidden"
-                        style={{
-                          border: imageValue === ref ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                          backgroundColor: 'var(--color-background)',
-                        }}
-                        title={galleryLabel}
-                      >
-                        <img src={item.data} alt={galleryLabel} className="w-full h-full object-cover" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            <EmbeddedGalleryGrid
+              content={content}
+              selectedValue={imageValue}
+              onSelectRef={setImageValue}
+              onDeleteRef={() => setImageValue('')}
+            />
 
             {resolvedPreviewSrc && (
               <div className="space-y-3">

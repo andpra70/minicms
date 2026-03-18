@@ -6,6 +6,7 @@ import { themes } from '@/themes/themes';
 import { resolveAppAssetUrl } from '@/app/lib/urls';
 import { loadTextFromFileserver, saveTextToFileserver } from '@/app/lib/fileserver';
 import { buildProjectFileName, setProjectUrl } from '@/app/lib/project-route';
+import { optimizeImageFile } from '@/app/lib/image-upload';
 
 const LOCAL_IMAGE_OPTIONS = [
   'img/2.webp',
@@ -55,6 +56,132 @@ const DEFAULT_SPACING = {
 };
 
 const PROJECT_NAME_STORAGE_KEY = 'cms-project-name';
+
+interface ThemeImageDropFieldProps {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+  previewMode?: 'contain' | 'cover';
+  localOptions?: string[];
+}
+
+function ThemeImageDropField({
+  label,
+  value,
+  placeholder,
+  onChange,
+  previewMode = 'cover',
+  localOptions = [],
+}: ThemeImageDropFieldProps) {
+  const [isOver, setIsOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Seleziona una immagine valida.');
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const dataUrl = await optimizeImageFile(file);
+      onChange(dataUrl);
+    } catch (error) {
+      console.error(error);
+      alert('Impossibile elaborare l\'immagine.');
+    } finally {
+      setIsUploading(false);
+      setIsOver(false);
+    }
+  };
+
+  const resolvedPreview = value ? resolveAppAssetUrl(value) : '';
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+        {label}
+      </label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-2 py-1 text-sm rounded font-mono"
+        style={{
+          backgroundColor: 'var(--color-background)',
+          color: 'var(--color-text)',
+          border: '1px solid var(--color-border)',
+        }}
+        placeholder={placeholder}
+      />
+      <label
+        onDragOver={(event) => {
+          event.preventDefault();
+          setIsOver(true);
+        }}
+        onDragLeave={() => setIsOver(false)}
+        onDrop={async (event) => {
+          event.preventDefault();
+          const file = event.dataTransfer.files?.[0];
+          if (file) {
+            await handleFile(file);
+          }
+        }}
+        className="block p-3 rounded cursor-pointer transition-colors"
+        style={{
+          backgroundColor: isOver ? 'color-mix(in srgb, var(--color-primary) 12%, var(--color-surface) 88%)' : 'var(--color-background)',
+          border: `1px dashed ${isOver ? 'var(--color-primary)' : 'var(--color-border)'}`,
+        }}
+      >
+        <div className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+          {isUploading ? 'Ottimizzazione in corso...' : 'Drop immagine o clicca per caricare'}
+        </div>
+        <div className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+          Se supera 300 KB viene ridimensionata automaticamente.
+        </div>
+        {resolvedPreview && (
+          <div
+            className="mt-3 h-24 rounded overflow-hidden"
+            style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}
+          >
+            <img src={resolvedPreview} alt={label} className="w-full h-full" style={{ objectFit: previewMode }} />
+          </div>
+        )}
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={async (event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              await handleFile(file);
+            }
+            event.target.value = '';
+          }}
+        />
+      </label>
+      {localOptions.length > 0 && (
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {localOptions.map((imagePath) => (
+            <button
+              key={imagePath}
+              type="button"
+              onClick={() => onChange(imagePath)}
+              className="h-14 rounded overflow-hidden"
+              style={{
+                border: value === imagePath ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-background)',
+              }}
+              title={imagePath}
+            >
+              <img src={resolveAppAssetUrl(imagePath)} alt={imagePath} className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function generateStaticHTML(menuData: any, contentData: any, theme: any) {
   const footerData = {
@@ -1245,77 +1372,28 @@ function ThemeEditor() {
         <h4 className="font-medium" style={{ color: 'var(--color-text)' }}>
           Immagini
         </h4>
-        
-        <div>
-          <label className="block text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>
-            Logo URL
-          </label>
-          <input
-            type="text"
-            value={customTheme.logo}
-            onChange={(e) => handleImageChange('logo', e.target.value)}
-            className="w-full px-2 py-1 text-sm rounded font-mono"
-            style={{
-              backgroundColor: 'var(--color-background)',
-              color: 'var(--color-text)',
-              border: '1px solid var(--color-border)',
-            }}
-            placeholder="https://..."
-          />
-          <div className="mt-2 grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {LOCAL_IMAGE_OPTIONS.map((imagePath) => (
-              <button
-                key={imagePath}
-                type="button"
-                onClick={() => handleImageChange('logo', imagePath)}
-                className="h-14 rounded overflow-hidden"
-                style={{
-                  border: customTheme.logo === imagePath ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                  backgroundColor: 'var(--color-background)',
-                }}
-                title={imagePath}
-              >
-                <img src={resolveAppAssetUrl(imagePath)} alt={imagePath} className="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
-        </div>
+        <ThemeImageDropField
+          label="Logo URL"
+          value={customTheme.logo}
+          onChange={(value) => handleImageChange('logo', value)}
+          placeholder="https://..."
+          previewMode="contain"
+          localOptions={LOCAL_IMAGE_OPTIONS}
+        />
 
-        <div>
-          <label className="block text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>
-            Sfondo Header URL
-          </label>
-          <input
-            type="text"
-            value={customTheme.headerBackground}
-            onChange={(e) => handleImageChange('headerBackground', e.target.value)}
-            className="w-full px-2 py-1 text-sm rounded font-mono"
-            style={{
-              backgroundColor: 'var(--color-background)',
-              color: 'var(--color-text)',
-              border: '1px solid var(--color-border)',
-            }}
-            placeholder="https://..."
-          />
-        </div>
+        <ThemeImageDropField
+          label="Sfondo Header URL"
+          value={customTheme.headerBackground}
+          onChange={(value) => handleImageChange('headerBackground', value)}
+          placeholder="https://..."
+        />
 
-        <div>
-          <label className="block text-xs mb-1" style={{ color: 'var(--color-text-secondary)' }}>
-            Sfondo Footer URL
-          </label>
-          <input
-            type="text"
-            value={customTheme.footerBackground}
-            onChange={(e) => handleImageChange('footerBackground', e.target.value)}
-            className="w-full px-2 py-1 text-sm rounded font-mono"
-            style={{
-              backgroundColor: 'var(--color-background)',
-              color: 'var(--color-text)',
-              border: '1px solid var(--color-border)',
-            }}
-            placeholder="https://..."
-          />
-        </div>
+        <ThemeImageDropField
+          label="Sfondo Footer URL"
+          value={customTheme.footerBackground}
+          onChange={(value) => handleImageChange('footerBackground', value)}
+          placeholder="https://..."
+        />
       </div>
 
       <div className="space-y-3">

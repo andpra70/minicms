@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Mail, Phone, MapPin, Plus, X, GripVertical } from 'lucide-react';
 import { InlineEditor, InlineImageEditor, InlineImagePositionEditor } from './InlineEditor';
 import { useAdmin } from '@/contexts/AdminContext';
+import { geocodeAddress, loadLeaflet } from '@/app/lib/leaflet';
+import { Calendar } from './ui/calendar';
+import { parseCalendarInput } from '@/app/lib/calendar-highlights';
 
 interface Section {
   type: string;
@@ -170,7 +173,7 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
             Aggiungi una nuova sezione
           </p>
           <div className="flex flex-wrap gap-2">
-            {['hero', 'content', 'features', 'services-list', 'blog-list', 'contact-info'].map((type) => (
+            {['hero', 'content', 'features', 'services-list', 'blog-list', 'contact-info', 'place', 'calendar'].map((type) => (
               <button
                 key={type}
                 onClick={() => addSection(type)}
@@ -200,6 +203,8 @@ function getSectionLabel(type: string) {
     'services-list': 'Servizi',
     'blog-list': 'Blog',
     'contact-info': 'Contatti',
+    place: 'Luogo',
+    calendar: 'Calendario',
   };
   return labels[type] || type;
 }
@@ -241,6 +246,24 @@ function createSectionTemplate(type: string) {
       return {
         type: 'contact-info',
         info: [createItemTemplate('contact-info')],
+      };
+    case 'place':
+      return {
+        type: 'place',
+        title: 'Dove siamo',
+        address: 'Piazza del Colosseo, Roma',
+        description: 'Indicazioni e punto di riferimento.',
+        geocodedAddress: '',
+        lat: null,
+        lng: null,
+        zoom: 15,
+      };
+    case 'calendar':
+      return {
+        type: 'calendar',
+        title: 'Calendario eventi',
+        description: 'Date importanti in evidenza.',
+        entries: '2026-03-20\n2026-03-24..2026-03-27\n2026-04-02',
       };
     case 'content':
     default:
@@ -323,9 +346,349 @@ function SectionRenderer({ section, pageId, sectionIndex }: { section: Section; 
       return <BlogListSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
     case 'contact-info':
       return <ContactInfoSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+    case 'place':
+      return <PlaceSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+    case 'calendar':
+      return <CalendarSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
     default:
       return null;
   }
+}
+
+function CalendarSection({ title, description, entries, pageId, sectionIndex }: any) {
+  const parsed = parseCalendarInput(entries);
+
+  return (
+    <div className="grid gap-8 md:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.1fr)] items-start">
+      <div className="space-y-4">
+        <h2
+          className="text-3xl font-bold"
+          style={{
+            color: 'var(--color-text)',
+            fontFamily: 'var(--font-h2)',
+            fontSize: 'var(--size-h2)',
+          }}
+        >
+          <InlineEditor
+            value={title}
+            path={['pages', pageId, 'sections', sectionIndex, 'title']}
+          />
+        </h2>
+        <p
+          style={{
+            color: 'var(--color-text-secondary)',
+            fontFamily: 'var(--font-body-copy)',
+            fontSize: 'var(--size-body-copy)',
+          }}
+        >
+          <InlineEditor
+            value={description}
+            type="textarea"
+            path={['pages', pageId, 'sections', sectionIndex, 'description']}
+          />
+        </p>
+        <div>
+          <div
+            className="mb-2 text-sm font-medium"
+            style={{ color: 'var(--color-text)' }}
+          >
+            Date evidenziate
+          </div>
+          <InlineEditor
+            value={entries}
+            type="textarea"
+            path={['pages', pageId, 'sections', sectionIndex, 'entries']}
+          />
+          <div
+            className="mt-2 text-xs"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            Usa una data per riga oppure separa con virgola o punto e virgola. Intervalli: `2026-03-24..2026-03-27`
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {parsed.entries.map((entry, index) => (
+            <span
+              key={`${entry.label}-${index}`}
+              className="px-3 py-1.5 rounded-full text-sm"
+              style={{
+                backgroundColor: 'var(--color-primary)',
+                color: '#ffffff',
+              }}
+            >
+              {entry.label}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div
+        className="rounded-lg p-4"
+        style={{
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <Calendar
+          showOutsideDays
+          modifiers={{ highlighted: parsed.modifiers }}
+          modifiersClassNames={{
+            highlighted: 'bg-primary text-primary-foreground rounded-md font-semibold',
+          }}
+          classNames={{
+            day_today: 'bg-accent text-accent-foreground rounded-md',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PlaceSection({
+  title,
+  address,
+  description,
+  lat,
+  lng,
+  zoom = 15,
+  geocodedAddress,
+  pageId,
+  sectionIndex,
+}: any) {
+  const { content, updateContent } = useAdmin();
+  const [runtimeCoords, setRuntimeCoords] = useState<{ lat: number; lng: number } | null>(
+    typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : null,
+  );
+  const [runtimeZoom, setRuntimeZoom] = useState<number>(Number.isFinite(Number(zoom)) ? Number(zoom) : 15);
+  const [mapError, setMapError] = useState('');
+  const mapNodeRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const contentRef = useRef(content);
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
+
+  useEffect(() => {
+    if (typeof lat === 'number' && typeof lng === 'number') {
+      setRuntimeCoords({ lat, lng });
+    }
+  }, [lat, lng]);
+
+  useEffect(() => {
+    const nextZoom = Number(zoom);
+    if (Number.isFinite(nextZoom)) {
+      setRuntimeZoom(nextZoom);
+    }
+  }, [zoom]);
+
+  useEffect(() => {
+    const trimmedAddress = String(address || '').trim();
+    if (!trimmedAddress) {
+      return;
+    }
+
+    const hasSavedCoords = typeof lat === 'number' && typeof lng === 'number';
+    if (hasSavedCoords && geocodedAddress === trimmedAddress) {
+      return;
+    }
+
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const coords = await geocodeAddress(trimmedAddress);
+        if (cancelled) {
+          return;
+        }
+
+        setRuntimeCoords(coords);
+        setMapError('');
+
+        const newContent = JSON.parse(JSON.stringify(content));
+        const targetSection = newContent.pages?.[pageId]?.sections?.[sectionIndex];
+        if (!targetSection) {
+          return;
+        }
+
+        if (
+          targetSection.lat === coords.lat &&
+          targetSection.lng === coords.lng &&
+          targetSection.geocodedAddress === trimmedAddress
+        ) {
+          return;
+        }
+
+        targetSection.lat = coords.lat;
+        targetSection.lng = coords.lng;
+        targetSection.geocodedAddress = trimmedAddress;
+        updateContent(newContent);
+      } catch (error) {
+        if (!cancelled) {
+          setMapError(error instanceof Error ? error.message : 'Errore mappa');
+        }
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [address, content, geocodedAddress, lat, lng, pageId, sectionIndex, updateContent]);
+
+  useEffect(() => {
+    if (!mapNodeRef.current || !runtimeCoords) {
+      return;
+    }
+
+    let cancelled = false;
+    loadLeaflet()
+      .then((L) => {
+        if (cancelled || !mapNodeRef.current) {
+          return;
+        }
+
+        if (!mapRef.current) {
+          mapRef.current = L.map(mapNodeRef.current, {
+            scrollWheelZoom: true,
+          }).setView([runtimeCoords.lat, runtimeCoords.lng], runtimeZoom);
+
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+          }).addTo(mapRef.current);
+
+          markerRef.current = L.marker([runtimeCoords.lat, runtimeCoords.lng]).addTo(mapRef.current);
+
+          mapRef.current.on('zoomend', () => {
+            if (!mapRef.current) {
+              return;
+            }
+
+            const nextZoom = mapRef.current.getZoom();
+            setRuntimeZoom(nextZoom);
+
+            const newContent = JSON.parse(JSON.stringify(contentRef.current));
+            const targetSection = newContent.pages?.[pageId]?.sections?.[sectionIndex];
+            if (!targetSection || targetSection.zoom === nextZoom) {
+              return;
+            }
+            targetSection.zoom = nextZoom;
+            updateContent(newContent);
+          });
+        } else {
+          mapRef.current.setView([runtimeCoords.lat, runtimeCoords.lng], runtimeZoom);
+          if (markerRef.current) {
+            markerRef.current.setLatLng([runtimeCoords.lat, runtimeCoords.lng]);
+          }
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setMapError(error instanceof Error ? error.message : 'Errore caricamento mappa');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pageId, runtimeCoords, runtimeZoom, sectionIndex, updateContent]);
+
+  useEffect(() => {
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, []);
+
+  return (
+    <div className="grid gap-8 md:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.1fr)] items-start">
+      <div className="space-y-4">
+        <h2
+          className="text-3xl font-bold"
+          style={{
+            color: 'var(--color-text)',
+            fontFamily: 'var(--font-h2)',
+            fontSize: 'var(--size-h2)',
+          }}
+        >
+          <InlineEditor
+            value={title}
+            path={['pages', pageId, 'sections', sectionIndex, 'title']}
+          />
+        </h2>
+        <div
+          className="inline-flex items-start gap-3 rounded-lg px-4 py-3"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <MapPin className="w-5 h-5 mt-0.5 shrink-0" style={{ color: 'var(--color-primary)' }} />
+          <div
+            style={{
+              color: 'var(--color-text)',
+              fontFamily: 'var(--font-body-copy)',
+              fontSize: 'var(--size-body-copy)',
+            }}
+          >
+            <InlineEditor
+              value={address}
+              type="textarea"
+              path={['pages', pageId, 'sections', sectionIndex, 'address']}
+            />
+          </div>
+        </div>
+        <p
+          style={{
+            color: 'var(--color-text-secondary)',
+            fontFamily: 'var(--font-body-copy)',
+            fontSize: 'var(--size-body-copy)',
+          }}
+        >
+          <InlineEditor
+            value={description}
+            type="textarea"
+            path={['pages', pageId, 'sections', sectionIndex, 'description']}
+          />
+        </p>
+        {mapError && (
+          <div
+            className="rounded-lg px-4 py-3 text-sm"
+            style={{
+              backgroundColor: '#fee',
+              color: '#b42318',
+              border: '1px solid #fda29b',
+            }}
+          >
+            {mapError}
+          </div>
+        )}
+      </div>
+      <div
+        className="overflow-hidden rounded-lg"
+        style={{
+          border: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-surface)',
+          minHeight: '360px',
+          position: 'relative',
+          zIndex: 0,
+        }}
+      >
+        {runtimeCoords ? (
+          <div ref={mapNodeRef} style={{ height: '360px', width: '100%' }} />
+        ) : (
+          <div
+            className="flex h-[360px] items-center justify-center px-6 text-center"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            Inserisci un indirizzo valido per visualizzare la mappa.
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function HeroSection({ title, subtitle, image, imagePosX = 50, imagePosY = 50, imageScale = 100, cta, pageId, sectionIndex }: any) {

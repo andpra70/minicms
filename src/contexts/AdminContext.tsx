@@ -1,5 +1,7 @@
 /** @jsxImportSource react */
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { loadTextFromFileserver } from '@/app/lib/fileserver';
+import { buildProjectFileName } from '@/app/lib/project-route';
 
 interface AdminContextType {
   isAdmin: boolean;
@@ -10,6 +12,9 @@ interface AdminContextType {
   updateContent: (newContent: any) => void;
   menu: any;
   updateMenu: (newMenu: any) => void;
+  currentProjectName: string | null;
+  isProjectLoading: boolean;
+  projectLoadError: string;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
@@ -31,6 +36,19 @@ const EMPTY_SITE: SiteData = {
   pages: {},
   gallery: [],
 };
+
+function setLocalStorageSafely(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+      console.warn(`Salvataggio localStorage saltato per quota esaurita: ${key}`);
+      return false;
+    }
+    throw error;
+  }
+}
 
 function parseStoredJson(raw: string | null) {
   if (!raw) {
@@ -55,7 +73,16 @@ function normalizeSite(input: any, fallback: SiteData = EMPTY_SITE): SiteData {
   };
 }
 
-function getBootState() {
+function getBootState(projectName: string | null) {
+  if (projectName) {
+    return {
+      source: 'project-route' as const,
+      site: { ...EMPTY_SITE },
+      legacyContent: null,
+      legacyMenu: null,
+    };
+  }
+
   const savedSite = parseStoredJson(localStorage.getItem('cms-site'));
   if (savedSite) {
     return {
@@ -91,13 +118,21 @@ function getBootState() {
   };
 }
 
-export function AdminProvider({ children }: { children: React.ReactNode }) {
-  const [bootState] = useState(() => getBootState());
+export function AdminProvider({
+  children,
+  projectName = null,
+}: {
+  children: React.ReactNode;
+  projectName?: string | null;
+}) {
+  const [bootState] = useState(() => getBootState(projectName));
   const [isAdmin, setIsAdminState] = useState<boolean>(() => {
     return localStorage.getItem('cms-admin-mode') === 'true';
   });
 
   const [site, setSite] = useState<any>(() => bootState.site);
+  const [isProjectLoading, setIsProjectLoading] = useState<boolean>(bootState.source === 'project-route');
+  const [projectLoadError, setProjectLoadError] = useState('');
 
   useEffect(() => {
     if (bootState.source === 'saved') {
@@ -106,7 +141,30 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
     let cancelled = false;
 
-    const loadDefaultSite = async () => {
+    const loadInitialSite = async () => {
+      if (bootState.source === 'project-route' && projectName) {
+        setIsProjectLoading(true);
+        setProjectLoadError('');
+        try {
+          const text = await loadTextFromFileserver(buildProjectFileName(projectName));
+          if (cancelled) {
+            return;
+          }
+
+          const parsed = JSON.parse(text);
+          setSite(normalizeSite(parsed, EMPTY_SITE));
+        } catch (error) {
+          if (!cancelled) {
+            setProjectLoadError(error instanceof Error ? error.message : 'Errore caricamento progetto');
+          }
+        } finally {
+          if (!cancelled) {
+            setIsProjectLoading(false);
+          }
+        }
+        return;
+      }
+
       try {
         const module = await import('@/data/site.json');
         if (cancelled) {
@@ -128,23 +186,30 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         setSite(defaultSite);
       } catch {
         // fallback: keep boot state already loaded from localStorage/empty defaults
+      } finally {
+        if (!cancelled) {
+          setIsProjectLoading(false);
+        }
       }
     };
 
-    loadDefaultSite();
+    loadInitialSite();
 
     return () => {
       cancelled = true;
     };
-  }, [bootState]);
+  }, [bootState, projectName]);
 
   useEffect(() => {
-    localStorage.setItem('cms-admin-mode', isAdmin.toString());
+    setLocalStorageSafely('cms-admin-mode', isAdmin.toString());
   }, [isAdmin]);
 
   useEffect(() => {
-    localStorage.setItem('cms-site', JSON.stringify(site));
-  }, [site]);
+    if (projectName) {
+      return;
+    }
+    setLocalStorageSafely('cms-site', JSON.stringify(site));
+  }, [projectName, site]);
 
   const setIsAdmin = (value: boolean) => {
     setIsAdminState(value);
@@ -174,7 +239,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const menu = { logo: site.logo || 'Mini CMS', items: site.items || [] };
 
   return (
-    <AdminContext.Provider value={{ isAdmin, setIsAdmin, site, updateSite, content, updateContent, menu, updateMenu }}>
+    <AdminContext.Provider value={{ isAdmin, setIsAdmin, site, updateSite, content, updateContent, menu, updateMenu, currentProjectName: projectName, isProjectLoading, projectLoadError }}>
       {children}
     </AdminContext.Provider>
   );

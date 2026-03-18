@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Settings, X, Save, Download, Upload, Paintbrush, FileCode, Maximize2, Minimize2 } from 'lucide-react';
+import { useState } from 'react';
+import { Settings, X, Save, Download, Upload, Paintbrush } from 'lucide-react';
 import { useAdmin } from '@/contexts/AdminContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { themes } from '@/themes/themes';
-import { resolveApiUrl, resolveAppAssetUrl } from '@/app/lib/urls';
+import { resolveAppAssetUrl } from '@/app/lib/urls';
+import { loadTextFromFileserver, saveTextToFileserver } from '@/app/lib/fileserver';
+import { buildProjectFileName, setProjectUrl } from '@/app/lib/project-route';
 
 const LOCAL_IMAGE_OPTIONS = [
   'img/2.webp',
@@ -40,6 +42,8 @@ const DEFAULT_SPACING = {
   section: '80px',
   density: 'normal' as 'normal' | 'compact' | 'ultra-compact',
 };
+
+const PROJECT_NAME_STORAGE_KEY = 'cms-project-name';
 
 function generateStaticHTML(menuData: any, contentData: any, theme: any) {
   const footerData = {
@@ -602,6 +606,64 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
     `;
   }
 
+  function renderPlaceSection(section: any, pageId: string, sectionIndex: number) {
+    const lat = Number(section.lat);
+    const lng = Number(section.lng);
+    const zoom = Number(section.zoom || 15);
+    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+    const delta = 0.01;
+    const embedSrc = hasCoords
+      ? `https://www.openstreetmap.org/export/embed.html?bbox=${lng - delta}%2C${lat - delta}%2C${lng + delta}%2C${lat + delta}&layer=mapnik&marker=${lat}%2C${lng}`
+      : '';
+
+    return `
+      <section class="page" id="${pageId}">
+        <div class="container">
+          <div class="grid grid-2">
+            <div>
+              <h2>${section.title || ''}</h2>
+              <p style="font-size: 1.125rem; line-height: 1.75;">${section.address || ''}</p>
+              <p style="font-size: 1.125rem; line-height: 1.75;">${section.description || ''}</p>
+            </div>
+            <div class="card" style="min-height: 360px;">
+              ${hasCoords ? `<iframe src="${embedSrc}" style="width:100%;height:360px;border:0;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>` : '<div class="card-content"><p>Mappa non disponibile.</p></div>'}
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderCalendarSection(section: any, pageId: string, sectionIndex: number) {
+    const parsedEntries = String(section.entries || '')
+      .split(/[\n,;]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => `<span class="badge">${escapeHtml(item)}</span>`)
+      .join('');
+
+    return `
+      <section class="page" id="${pageId}">
+        <div class="container">
+          <div class="grid grid-2">
+            <div>
+              <h2>${section.title || ''}</h2>
+              <p style="font-size: 1.125rem; line-height: 1.75;">${section.description || ''}</p>
+              <div>${parsedEntries || '<span class="badge">Nessuna data configurata</span>'}</div>
+            </div>
+            <div class="card">
+              <div class="card-content">
+                <h3>Date in evidenza</h3>
+                <p>Questa esportazione statica mostra l'elenco delle date configurate.</p>
+                <div>${parsedEntries || '<span class="badge">Nessuna data configurata</span>'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
   function renderSection(section: any, pageId: string, sectionIndex: number) {
     switch (section.type) {
       case 'hero':
@@ -616,6 +678,10 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
         return renderBlogListSection(section, pageId, sectionIndex);
       case 'contact-info':
         return renderContactInfoSection(section, pageId, sectionIndex);
+      case 'place':
+        return renderPlaceSection(section, pageId, sectionIndex);
+      case 'calendar':
+        return renderCalendarSection(section, pageId, sectionIndex);
       default:
         return '';
     }
@@ -731,15 +797,14 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
 }
 
 export function AdminPanel() {
-  const { isAdmin, setIsAdmin } = useAdmin();
+  const { isAdmin, setIsAdmin, site, updateSite } = useAdmin();
   const [showPanel, setShowPanel] = useState(false);
-  const [activeTab, setActiveTab] = useState<'content' | 'theme'>('content');
 
   if (!isAdmin) {
     return (
       <button
         onClick={() => setIsAdmin(true)}
-        className="fixed bottom-4 right-4 p-3 rounded-full shadow-lg z-50 opacity-50 hover:opacity-100 transition-opacity"
+        className="fixed bottom-4 right-4 p-3 rounded-full shadow-lg z-[1300] opacity-50 hover:opacity-100 transition-opacity"
         style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
         title="Attiva modalità admin"
       >
@@ -750,18 +815,22 @@ export function AdminPanel() {
 
   return (
     <>
-      <button
-        onClick={() => setShowPanel(!showPanel)}
-        className="fixed bottom-4 right-4 p-3 rounded-full shadow-lg z-50 transition-transform hover:scale-110"
-        style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
-        title="Pannello Admin"
-      >
-        {showPanel ? <X className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
-      </button>
+      <div className="fixed bottom-4 right-4 z-[1300] flex flex-col items-end gap-3">
+        <ContentActions site={site} updateSite={updateSite} />
+
+        <button
+          onClick={() => setShowPanel((prev) => !prev)}
+          className="p-3 rounded-full shadow-lg transition-transform hover:scale-110"
+          style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
+          title="Tema"
+        >
+          <Paintbrush className="w-5 h-5" />
+        </button>
+      </div>
 
       {showPanel && (
         <div
-          className="fixed bottom-20 right-4 w-96 max-h-[600px] rounded-lg shadow-2xl z-50 overflow-hidden flex flex-col"
+          className="fixed bottom-20 right-4 w-96 max-h-[600px] rounded-lg shadow-2xl z-[1300] overflow-hidden flex flex-col"
           style={{
             backgroundColor: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
@@ -772,51 +841,38 @@ export function AdminPanel() {
             className="p-4 flex items-center justify-between"
             style={{ borderBottom: '1px solid var(--color-border)' }}
           >
-            <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
-              Pannello Admin
-            </h3>
+            <div className="flex items-center gap-3">
+              <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
+                Tema
+              </h3>
+              <button
+                onClick={() => setIsAdmin(false)}
+                className="text-xs px-2 py-1 rounded"
+                style={{
+                  backgroundColor: 'var(--color-background)',
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
+                Esci
+              </button>
+            </div>
             <button
-              onClick={() => setIsAdmin(false)}
-              className="text-sm px-3 py-1 rounded"
+              onClick={() => setShowPanel(false)}
+              className="p-2 rounded"
               style={{
                 backgroundColor: 'var(--color-background)',
-                color: 'var(--color-text-secondary)',
+                color: 'var(--color-text)',
+                border: '1px solid var(--color-border)',
               }}
+              title="Chiudi pannello"
+              aria-label="Chiudi pannello"
             >
-              Esci
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Tabs */}
-          <div
-            className="flex"
-            style={{ borderBottom: '1px solid var(--color-border)' }}
-          >
-            <button
-              onClick={() => setActiveTab('content')}
-              className="flex-1 px-4 py-2 font-medium transition-colors"
-              style={{
-                backgroundColor: activeTab === 'content' ? 'var(--color-background)' : 'transparent',
-                color: activeTab === 'content' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              }}
-            >
-              Contenuti
-            </button>
-            <button
-              onClick={() => setActiveTab('theme')}
-              className="flex-1 px-4 py-2 font-medium transition-colors"
-              style={{
-                backgroundColor: activeTab === 'theme' ? 'var(--color-background)' : 'transparent',
-                color: activeTab === 'theme' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              }}
-            >
-              Tema
-            </button>
-          </div>
-
-          {/* Content */}
           <div className="flex-1 overflow-y-auto p-4">
-            {activeTab === 'content' ? <ContentEditor /> : <ThemeEditor />}
+            <ThemeEditor />
           </div>
         </div>
       )}
@@ -824,73 +880,60 @@ export function AdminPanel() {
   );
 }
 
-function ContentEditor() {
-  const { site, updateSite } = useAdmin();
-  const { theme } = useTheme();
-  const [jsonText, setJsonText] = useState(JSON.stringify(site, null, 2));
+function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite: any) => void }) {
   const [error, setError] = useState('');
-  const [isFullscreen, setIsFullscreen] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { currentProjectName } = useAdmin();
+  const [projectName, setProjectName] = useState(() => currentProjectName || localStorage.getItem(PROJECT_NAME_STORAGE_KEY) || 'site');
 
-  useEffect(() => {
-    setJsonText(JSON.stringify(site, null, 2));
-  }, [site]);
+  const fileName = buildProjectFileName(projectName);
+  const closeMenu = () => setIsMenuOpen(false);
+  const handleProjectNameChange = (value: string) => {
+    setProjectName(value);
+    localStorage.setItem(PROJECT_NAME_STORAGE_KEY, value);
+  };
 
   const handleSave = () => {
-    try {
-      const parsed = JSON.parse(jsonText);
-      updateSite(parsed);
-      setError('');
-      alert('Contenuti salvati con successo!');
-    } catch (e) {
-      setError('JSON non valido');
-    }
+    updateSite(site);
+    setError('');
+    closeMenu();
   };
 
   const handleDownload = () => {
-    const blob = new Blob([jsonText], { type: 'application/json' });
+    setProjectUrl(projectName);
+    const blob = new Blob([JSON.stringify(site, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'site.json';
+    a.download = fileName;
     a.click();
+    closeMenu();
   };
 
-  const handleGenerateStaticHTML = async () => {
+  const handleSaveToFileserver = async () => {
     try {
-      const menuData = { logo: site.logo, items: site.items || [], footer: site.footer || undefined };
-      const contentData = { pages: site.pages || {}, gallery: site.gallery || [] };
-      
-      // Genera l'HTML statico con il tema corrente
-      const staticHTML = generateStaticHTML(menuData, contentData, theme);
-      
-      // Salva nel folder public tramite API
-      try {
-        const response = await fetch(resolveApiUrl('api/save-static-html'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ html: staticHTML })
-        });
-        
-        if (!response.ok) {
-          throw new Error('Errore nel salvataggio');
-        }
-        
-        alert('Sito statico generato e salvato in public/sito-statico.html!');
-      } catch (apiError) {
-        console.warn('API non disponibile, scaricamento fallback:', apiError);
-        // Fallback: scarica il file dal browser se l'API non è disponibile
-        const blob = new Blob([staticHTML], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'sito-statico.html';
-        a.click();
-        URL.revokeObjectURL(url);
-        alert('File scaricato in locale');
-      }
+      setProjectUrl(projectName);
+      await saveTextToFileserver(fileName, JSON.stringify(site, null, 2));
+      setError('');
+      closeMenu();
     } catch (error) {
-      console.error('Errore:', error);
-      alert('Errore nella generazione del sito statico');
+      console.error('Errore salvataggio fileserver:', error);
+      alert(`Salvataggio su fileserver fallito: ${error instanceof Error ? error.message : 'errore sconosciuto'}`);
+    }
+  };
+
+  const handleLoadFromFileserver = async () => {
+    try {
+      setProjectUrl(projectName);
+      const text = await loadTextFromFileserver(fileName);
+      const parsed = JSON.parse(text);
+      updateSite(parsed);
+      setError('');
+      closeMenu();
+    } catch (error) {
+      console.error('Errore caricamento fileserver:', error);
+      setError(error instanceof Error && error.message.includes('JSON') ? 'JSON non valido nel file caricato' : '');
+      alert(`Caricamento da fileserver fallito: ${error instanceof Error ? error.message : 'errore sconosciuto'}`);
     }
   };
 
@@ -899,29 +942,59 @@ function ContentEditor() {
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const text = event.target?.result as string;
-        setJsonText(text);
+        try {
+          const text = event.target?.result as string;
+          const parsed = JSON.parse(text);
+          updateSite(parsed);
+          setError('');
+          closeMenu();
+        } catch {
+          setError('JSON non valido nel file caricato');
+          alert('Caricamento file fallito: JSON non valido');
+        } finally {
+          e.target.value = '';
+        }
       };
       reader.readAsText(file);
     }
   };
 
-  const actionButtons = (
-    <>
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={handleSave}
-          className={`flex items-center ${isFullscreen ? 'gap-2 px-3' : 'justify-center px-2'} py-2 rounded text-sm font-medium`}
-          style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
-          title="Salva"
-          aria-label="Salva"
-        >
-          <Save className="w-4 h-4" />
-          {isFullscreen && 'Salva'}
-        </button>
+  return (
+    <div
+      className="flex flex-col items-end gap-2"
+      onMouseEnter={() => setIsMenuOpen(true)}
+      onMouseLeave={() => setIsMenuOpen(false)}
+    >
+      <div
+        className={`rounded-lg shadow-2xl p-2 flex flex-col gap-2 min-w-56 transition-all duration-200 ${isMenuOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}
+        style={{
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <div className="flex flex-col gap-1 px-1 pb-1">
+          <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+            Nome progetto
+          </label>
+          <input
+            type="text"
+            value={projectName}
+            onChange={(e) => handleProjectNameChange(e.target.value)}
+            className="w-full px-2 py-2 rounded text-sm"
+            style={{
+              backgroundColor: 'var(--color-background)',
+              color: 'var(--color-text)',
+              border: '1px solid var(--color-border)',
+            }}
+            placeholder="nome-progetto"
+          />
+          <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+            File: {fileName}
+          </div>
+        </div>
         <button
           onClick={handleDownload}
-          className={`flex items-center ${isFullscreen ? 'gap-2 px-3' : 'justify-center px-2'} py-2 rounded text-sm`}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm"
           style={{
             backgroundColor: 'var(--color-background)',
             color: 'var(--color-text)',
@@ -931,23 +1004,10 @@ function ContentEditor() {
           aria-label="Scarica"
         >
           <Download className="w-4 h-4" />
-          {isFullscreen && 'Scarica'}
-        </button>
-        <button
-          onClick={handleGenerateStaticHTML}
-          className={`flex items-center ${isFullscreen ? 'gap-2 px-3' : 'justify-center px-2'} py-2 rounded text-sm font-medium`}
-          style={{
-            backgroundColor: 'var(--color-secondary)',
-            color: '#ffffff',
-          }}
-          title="Esporta HTML"
-          aria-label="Esporta HTML"
-        >
-          <FileCode className="w-4 h-4" />
-          {isFullscreen && 'Esporta HTML'}
+          Scarica
         </button>
         <label
-          className={`flex items-center ${isFullscreen ? 'gap-2 px-3' : 'justify-center px-2'} py-2 rounded text-sm cursor-pointer`}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm cursor-pointer"
           style={{
             backgroundColor: 'var(--color-background)',
             color: 'var(--color-text)',
@@ -957,86 +1017,74 @@ function ContentEditor() {
           aria-label="Carica JSON"
         >
           <Upload className="w-4 h-4" />
-          {isFullscreen && 'Carica'}
+          Carica
           <input type="file" accept=".json" onChange={handleUpload} className="hidden" />
         </label>
         <button
-          onClick={() => setIsFullscreen((prev) => !prev)}
-          className={`flex items-center ${isFullscreen ? 'gap-2 px-3' : 'justify-center px-2'} py-2 rounded text-sm`}
+          onClick={handleSaveToFileserver}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm"
           style={{
             backgroundColor: 'var(--color-background)',
             color: 'var(--color-text)',
             border: '1px solid var(--color-border)',
           }}
-          title={isFullscreen ? 'Riduci' : 'Apri editor JSON'}
-          aria-label={isFullscreen ? 'Riduci' : 'Apri editor JSON'}
+          title="Salva su fileserver"
+          aria-label="Salva su fileserver"
         >
-          {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          {isFullscreen && 'Riduci'}
+          <Upload className="w-4 h-4" />
+          Salva FS
+        </button>
+        <button
+          onClick={handleLoadFromFileserver}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm"
+          style={{
+            backgroundColor: 'var(--color-background)',
+            color: 'var(--color-text)',
+            border: '1px solid var(--color-border)',
+          }}
+          title="Carica da fileserver"
+          aria-label="Carica da fileserver"
+        >
+          <Download className="w-4 h-4" />
+          Carica FS
+        </button>
+        <button
+          onClick={handleSave}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm font-medium"
+          style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
+          title="Salva"
+          aria-label="Salva"
+        >
+          <Save className="w-4 h-4" />
+          Salva
         </button>
       </div>
-
       {error && (
         <div
-          className="p-2 rounded text-sm"
+          className="max-w-64 p-2 rounded text-sm"
           style={{ backgroundColor: '#fee', color: '#c00' }}
         >
           {error}
         </div>
       )}
-    </>
-  );
-
-  if (isFullscreen) {
-    return (
-      <div
-        className="fixed inset-2 sm:inset-4 z-[70] rounded-lg shadow-2xl p-4 flex flex-col gap-4"
-        style={{
-          backgroundColor: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-        }}
+      <button
+        onClick={() => setIsMenuOpen((prev) => !prev)}
+        className="p-3 rounded-full shadow-lg transition-transform hover:scale-110"
+        style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
+        title="Azioni contenuti"
       >
-        <div className="flex items-center justify-between">
-          <h4 className="font-semibold" style={{ color: 'var(--color-text)' }}>
-            Editor JSON (Schermo intero)
-          </h4>
-          <button
-            onClick={() => setIsFullscreen(false)}
-            className="px-3 py-2 rounded text-sm inline-flex items-center gap-2"
-            style={{
-              backgroundColor: 'var(--color-background)',
-              color: 'var(--color-text)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            <Minimize2 className="w-4 h-4" />
-            Riduci
-          </button>
-        </div>
-        {actionButtons}
-        <textarea
-          value={jsonText}
-          onChange={(e) => setJsonText(e.target.value)}
-          className="w-full p-3 rounded font-mono text-sm flex-1 min-h-0"
-          style={{
-            backgroundColor: 'var(--color-background)',
-            color: 'var(--color-text)',
-            border: '1px solid var(--color-border)',
-          }}
-          spellCheck={false}
-        />
-      </div>
-    );
-  }
-
-  return <div className="space-y-4">{actionButtons}</div>;
+        <Settings className="w-5 h-5" />
+      </button>
+    </div>
+  );
 }
 
 function ThemeEditor() {
   const { theme, setTheme, availableThemes } = useTheme();
-  const { menu, updateMenu } = useAdmin();
+  const { menu, updateMenu, site, currentProjectName } = useAdmin();
   const [customTheme, setCustomTheme] = useState(theme);
   const [themeName, setThemeName] = useState('');
+  const projectFileName = buildProjectFileName(currentProjectName || localStorage.getItem(PROJECT_NAME_STORAGE_KEY) || 'site');
 
   const handleColorChange = (key: keyof typeof theme.colors, value: string) => {
     setCustomTheme({
@@ -1146,6 +1194,9 @@ function ThemeEditor() {
 
   return (
     <div className="space-y-4">
+      <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+        File attivo: {projectFileName} | Pagine: {Object.keys(site?.pages || {}).length}
+      </div>
       <div>
         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
           Titolo Sito

@@ -12,11 +12,31 @@ interface PageData {
 export function PageLayout() {
   const { pageId = 'home', subPageId } = useParams();
   const location = useLocation();
-  const { content } = useAdmin();
+  const { content, isProjectLoading, projectLoadError, currentProjectName } = useAdmin();
   const resolvedPageId = subPageId || pageId;
   
   const pages: { [key: string]: PageData } = content.pages;
   const page = pages[resolvedPageId];
+
+  if (isProjectLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center px-6 py-20">
+        <div style={{ color: 'var(--color-text-secondary)' }}>
+          Caricamento progetto {currentProjectName ? `"${currentProjectName}"` : ''}...
+        </div>
+      </div>
+    );
+  }
+
+  if (projectLoadError && !page) {
+    return (
+      <div className="flex-1 flex items-center justify-center px-6 py-20">
+        <div className="max-w-xl text-center" style={{ color: 'var(--color-text-secondary)' }}>
+          Errore caricamento progetto {currentProjectName ? `"${currentProjectName}"` : ''}: {projectLoadError}
+        </div>
+      </div>
+    );
+  }
 
   if (!page) {
     return <Navigate to="/" replace />;

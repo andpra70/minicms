@@ -5,11 +5,14 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { PageLayout } from './components/PageLayout';
 import { AdminPanel } from './components/AdminPanel';
+import { getProjectNameFromUrl } from '@/app/lib/project-route';
 
 export default function App() {
+  const projectName = getProjectNameFromUrl();
+
   return (
     <ThemeProvider>
-      <AdminProvider>
+      <AdminProvider key={projectName || 'default-project'} projectName={projectName}>
         <HashRouter>
           <div 
             className="min-h-screen flex flex-col transition-colors duration-300"

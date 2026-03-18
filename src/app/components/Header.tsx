@@ -268,7 +268,7 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-50 backdrop-blur-sm relative"
+      className="sticky top-0 z-[1200] backdrop-blur-sm relative"
       style={{
         backgroundColor: 'var(--color-surface)',
         borderBottom: '1px solid var(--color-border)',

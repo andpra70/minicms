@@ -52,6 +52,16 @@ export default defineConfig({
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
 
+  server: {
+    proxy: {
+      '/fileserver': {
+        target: 'https://zanotti.iliadboxos.it:55443',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
+
   // Copia la cartella public nella dist
   publicDir: 'public',
 })

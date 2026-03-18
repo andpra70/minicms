@@ -15,12 +15,14 @@ interface MenuItem {
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [siteTitleDraft, setSiteTitleDraft] = useState('');
   const [draggedMenu, setDraggedMenu] = useState<{ level: 'top' | 'child'; parentId?: string; itemId: string } | null>(null);
   const [dropIndicator, setDropIndicator] = useState<{ level: 'top' | 'child'; itemId: string; parentId?: string; position: 'before' | 'after' } | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, setTheme, availableThemes } = useTheme();
-  const { isAdmin, canEdit, menu, updateMenu, content, updateContent } = useAdmin();
+  const { isAdmin, canEdit, menu, updateMenu, content, updateContent, site, updateSite } = useAdmin();
 
   const menuItems: MenuItem[] = Array.isArray(menu?.items) ? menu.items : [];
 
@@ -236,6 +238,25 @@ export function Header() {
     }
   };
 
+  const handleStartTitleEdit = () => {
+    setSiteTitleDraft(menu.logo || 'Mini CMS');
+    setIsEditingTitle(true);
+  };
+
+  const handleSaveTitleEdit = () => {
+    const nextValue = siteTitleDraft.trim() || 'Mini CMS';
+    updateSite({
+      ...site,
+      logo: nextValue,
+    });
+    setIsEditingTitle(false);
+  };
+
+  const handleCancelTitleEdit = () => {
+    setSiteTitleDraft(menu.logo || 'Mini CMS');
+    setIsEditingTitle(false);
+  };
+
   const handleEditRouteLabel = (itemToEdit: MenuItem, parentId?: string) => {
     if (!canEdit) return;
     const nextLabel = window.prompt('Nuova label pagina', itemToEdit.label);
@@ -294,8 +315,7 @@ export function Header() {
 
       <nav className="relative mx-auto px-4 sm:px-6 lg:px-8" style={{ maxWidth: 'var(--container-width)' }}>
         <div className="flex h-16 items-center justify-between">
-          <Link
-            to="/"
+          <div
             className="flex items-center gap-3 font-bold text-xl"
             style={{
               color: 'var(--color-primary)',
@@ -310,8 +330,76 @@ export function Header() {
                 border: '2px solid var(--color-primary)',
               }}
             />
-            {menu.logo}
-          </Link>
+            {canEdit ? (
+              isEditingTitle ? (
+                <span className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={siteTitleDraft}
+                    onChange={(e) => setSiteTitleDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSaveTitleEdit();
+                      }
+                      if (e.key === 'Escape') {
+                        handleCancelTitleEdit();
+                      }
+                    }}
+                    className="px-2 py-1 rounded"
+                    style={{
+                      backgroundColor: 'var(--color-background)',
+                      color: 'var(--color-primary)',
+                      border: '1px solid var(--color-border)',
+                      fontFamily: 'var(--font-site-title)',
+                      fontSize: 'var(--size-site-title)',
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveTitleEdit}
+                    className="w-6 h-6 rounded-full inline-flex items-center justify-center"
+                    style={{
+                      backgroundColor: 'var(--color-background)',
+                      color: 'var(--color-text)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                    title="Salva titolo sito"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelTitleEdit}
+                    className="w-6 h-6 rounded-full inline-flex items-center justify-center"
+                    style={{
+                      backgroundColor: 'var(--color-background)',
+                      color: 'var(--color-text)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                    title="Annulla modifica titolo sito"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleStartTitleEdit}
+                  className="inline-flex items-center gap-2 text-left"
+                  style={{ color: 'inherit' }}
+                  title="Modifica titolo sito"
+                >
+                  <span>{menu.logo || 'Mini CMS'}</span>
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )
+            ) : (
+              <Link to="/" style={{ color: 'inherit' }}>
+                {menu.logo}
+              </Link>
+            )}
+          </div>
 
           <div className="hidden md:flex items-center gap-6">
             {menuItems.map((item) => (

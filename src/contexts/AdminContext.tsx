@@ -5,7 +5,6 @@ import { buildProjectFileName, hasEditModeFromUrl } from '@/app/lib/project-rout
 
 interface AdminContextType {
   isAdmin: boolean;
-  setIsAdmin: (value: boolean) => void;
   canEdit: boolean;
   editHandlesEnabled: boolean;
   setEditHandlesEnabled: (value: boolean) => void;
@@ -131,9 +130,7 @@ export function AdminProvider({
   projectName?: string | null;
 }) {
   const [bootState] = useState(() => getBootState(projectName));
-  const [isAdmin, setIsAdminState] = useState<boolean>(() => {
-    return hasEditModeFromUrl() || localStorage.getItem('cms-admin-mode') === 'true';
-  });
+  const isAdmin = hasEditModeFromUrl();
   const [editHandlesEnabled, setEditHandlesEnabledState] = useState<boolean>(() => {
     const raw = localStorage.getItem('cms-edit-handles-enabled');
     return raw === null ? false : raw === 'true';
@@ -210,16 +207,6 @@ export function AdminProvider({
   }, [bootState, projectName]);
 
   useEffect(() => {
-    setLocalStorageSafely('cms-admin-mode', isAdmin.toString());
-  }, [isAdmin]);
-
-  useEffect(() => {
-    if (hasEditModeFromUrl()) {
-      setIsAdminState(true);
-    }
-  }, []);
-
-  useEffect(() => {
     setLocalStorageSafely('cms-edit-handles-enabled', editHandlesEnabled.toString());
   }, [editHandlesEnabled]);
 
@@ -229,10 +216,6 @@ export function AdminProvider({
     }
     setLocalStorageSafely('cms-site', JSON.stringify(site));
   }, [projectName, site]);
-
-  const setIsAdmin = (value: boolean) => {
-    setIsAdminState(value);
-  };
 
   const setEditHandlesEnabled = (value: boolean) => {
     setEditHandlesEnabledState(value);
@@ -263,7 +246,7 @@ export function AdminProvider({
   const canEdit = isAdmin && editHandlesEnabled;
 
   return (
-    <AdminContext.Provider value={{ isAdmin, setIsAdmin, canEdit, editHandlesEnabled, setEditHandlesEnabled, site, updateSite, content, updateContent, menu, updateMenu, currentProjectName: projectName, isProjectLoading, projectLoadError }}>
+    <AdminContext.Provider value={{ isAdmin, canEdit, editHandlesEnabled, setEditHandlesEnabled, site, updateSite, content, updateContent, menu, updateMenu, currentProjectName: projectName, isProjectLoading, projectLoadError }}>
       {children}
     </AdminContext.Provider>
   );

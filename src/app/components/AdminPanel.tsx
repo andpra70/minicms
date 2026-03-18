@@ -1381,12 +1381,6 @@ function ThemeEditor() {
     });
   };
 
-  const handleSiteTitleChange = (value: string) => {
-    const newMenu = JSON.parse(JSON.stringify(menu));
-    newMenu.logo = value;
-    updateMenu(newMenu);
-  };
-
   const typography = { ...DEFAULT_TYPOGRAPHY, ...(customTheme.typography || {}) };
   const spacing = { ...DEFAULT_SPACING, ...(customTheme.spacing || {}) };
 
@@ -1395,24 +1389,6 @@ function ThemeEditor() {
       <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
         File attivo: {projectFileName} | Pagine: {Object.keys(site?.pages || {}).length}
       </div>
-      <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
-          Titolo Sito
-        </label>
-        <input
-          type="text"
-          value={menu.logo || ''}
-          onChange={(e) => handleSiteTitleChange(e.target.value)}
-          className="w-full px-3 py-2 rounded text-sm"
-          style={{
-            backgroundColor: 'var(--color-background)',
-            color: 'var(--color-text)',
-            border: '1px solid var(--color-border)',
-          }}
-          placeholder="Titolo del sito"
-        />
-      </div>
-
       <div>
         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
           Font Tema (unico)

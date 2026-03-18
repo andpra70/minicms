@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Theme, themes, defaultTheme } from '@/themes/themes';
+import { useAdmin } from '@/contexts/AdminContext';
 
 interface ThemeContextType {
   theme: Theme;
   setTheme: (themeId: string) => void;
+  updateTheme: (nextTheme: Theme) => void;
   availableThemes: Theme[];
 }
 
@@ -18,11 +20,33 @@ const defaultTypography = {
   bodySize: '1.125rem',
 };
 
+function normalizeTheme(input?: Partial<Theme> | null): Theme {
+  return {
+    ...defaultTheme,
+    ...(input || {}),
+    colors: {
+      ...defaultTheme.colors,
+      ...(input?.colors || {}),
+    },
+    fonts: {
+      ...defaultTheme.fonts,
+      ...(input?.fonts || {}),
+    },
+    typography: {
+      ...defaultTypography,
+      ...(defaultTheme.typography || {}),
+      ...(input?.typography || {}),
+    },
+    spacing: {
+      ...defaultTheme.spacing,
+      ...(input?.spacing || {}),
+    },
+  };
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    const savedThemeId = localStorage.getItem('cms-theme-id');
-    return themes.find(t => t.id === savedThemeId) || defaultTheme;
-  });
+  const { site, updateSite } = useAdmin();
+  const theme = normalizeTheme(site?.theme || defaultTheme);
 
   useEffect(() => {
     // Applica il tema al documento
@@ -62,13 +86,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setTheme = (themeId: string) => {
     const newTheme = themes.find(t => t.id === themeId);
     if (newTheme) {
-      setThemeState(newTheme);
-      localStorage.setItem('cms-theme-id', themeId);
+      updateTheme(newTheme);
     }
   };
 
+  const updateTheme = (nextTheme: Theme) => {
+    updateSite({
+      ...(site || {}),
+      theme: normalizeTheme(nextTheme),
+    });
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, availableThemes: themes }}>
+    <ThemeContext.Provider value={{ theme, setTheme, updateTheme, availableThemes: themes }}>
       {children}
     </ThemeContext.Provider>
   );

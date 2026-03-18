@@ -40,6 +40,7 @@ function getSectionAnchor(section: Section, sectionIndex: number) {
 export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
   const { canEdit, content, updateContent } = useAdmin();
   const [draggedSectionIndex, setDraggedSectionIndex] = useState<number | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<{ index: number; position: 'before' | 'after' } | null>(null);
 
   const handleDragStart = (e: React.DragEvent<HTMLElement>, index: number) => {
     if (!canEdit) {
@@ -84,8 +85,8 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
     updateContent(newContent);
   };
 
-  const moveSection = (fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex) {
+  const moveSection = (fromIndex: number, toIndex: number, position: 'before' | 'after') => {
+    if (fromIndex === toIndex && position === 'before') {
       return;
     }
     const newContent = JSON.parse(JSON.stringify(content));
@@ -94,7 +95,9 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
       return;
     }
     const [moved] = pageSections.splice(fromIndex, 1);
-    pageSections.splice(toIndex, 0, moved);
+    const targetIndex = position === 'after' ? toIndex + 1 : toIndex;
+    const adjustedIndex = fromIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    pageSections.splice(adjustedIndex, 0, moved);
     updateContent(newContent);
   };
 
@@ -108,7 +111,13 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
           data-section-index={index}
           className="relative"
           onDragOverCapture={(e) => {
-            if (canEdit) e.preventDefault();
+            if (!canEdit) {
+              return;
+            }
+            e.preventDefault();
+            const rect = e.currentTarget.getBoundingClientRect();
+            const position = e.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
+            setDropIndicator({ index, position });
           }}
           onDropCapture={(e) => {
             if (!canEdit) {
@@ -117,8 +126,16 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
             e.preventDefault();
             const fromIndex = readDraggedIndex(e);
             if (fromIndex !== null) {
-              moveSection(fromIndex, index);
+              const rect = e.currentTarget.getBoundingClientRect();
+              const position = e.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
+              moveSection(fromIndex, index, position);
               setDraggedSectionIndex(null);
+              setDropIndicator(null);
+            }
+          }}
+          onDragLeaveCapture={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+              setDropIndicator((current) => (current?.index === index ? null : current));
             }
           }}
           style={{
@@ -156,6 +173,18 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
             >
               <X className="w-4 h-4" />
             </button>
+          )}
+          {dropIndicator?.index === index && (
+            <div
+              className="absolute left-0 right-0 z-20 pointer-events-none"
+              style={{
+                [dropIndicator.position === 'before' ? 'top' : 'bottom']: '-8px',
+                height: '4px',
+                backgroundColor: 'var(--color-primary)',
+                borderRadius: '999px',
+                boxShadow: '0 0 0 2px var(--color-background)',
+              }}
+            />
           )}
           <SectionRenderer section={section} pageId={pageId} sectionIndex={index} />
         </div>

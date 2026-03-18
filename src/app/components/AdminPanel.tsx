@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Settings, X, Save, Download, Upload, Paintbrush } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Settings, X, Download, Upload, Paintbrush } from 'lucide-react';
 import { useAdmin } from '@/contexts/AdminContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { themes } from '@/themes/themes';
@@ -28,15 +28,15 @@ const FONT_OPTIONS = [
   { label: 'Instrument Sans', value: '"Instrument Sans", sans-serif' },
   { label: 'Syne', value: 'Syne, sans-serif' },
   { label: 'Archivo', value: 'Archivo, sans-serif' },
-  { label: 'General Sans', value: '"General Sans", sans-serif' },
   { label: 'IBM Plex Sans', value: '"IBM Plex Sans", sans-serif' },
   { label: 'Work Sans', value: '"Work Sans", sans-serif' },
   { label: 'Public Sans', value: '"Public Sans", sans-serif' },
   { label: 'Epilogue', value: 'Epilogue, sans-serif' },
-  { label: 'Cabinet Grotesk', value: '"Cabinet Grotesk", sans-serif' },
   { label: 'Mulish', value: 'Mulish, sans-serif' },
   { label: 'Onest', value: 'Onest, sans-serif' },
   { label: 'Fraunces', value: 'Fraunces, serif' },
+  { label: 'Be Vietnam Pro', value: '"Be Vietnam Pro", sans-serif' },
+  { label: 'Albert Sans', value: '"Albert Sans", sans-serif' },
 ];
 
 const DEFAULT_TYPOGRAPHY = {
@@ -810,18 +810,10 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
 export function AdminPanel() {
   const { isAdmin, setIsAdmin, site, updateSite, editHandlesEnabled, setEditHandlesEnabled } = useAdmin();
   const [showPanel, setShowPanel] = useState(false);
+  const canShowEditHandlesToggle = new URLSearchParams(window.location.search).get('edit') === '1';
 
   if (!isAdmin) {
-    return (
-      <button
-        onClick={() => setIsAdmin(true)}
-        className="fixed bottom-4 right-4 p-3 rounded-full shadow-lg z-[1300] opacity-50 hover:opacity-100 transition-opacity"
-        style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
-        title="Attiva modalità admin"
-      >
-        <Settings className="w-5 h-5" />
-      </button>
-    );
+    return null;
   }
 
   return (
@@ -858,16 +850,6 @@ export function AdminPanel() {
               <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
                 Tema
               </h3>
-              <button
-                onClick={() => setIsAdmin(false)}
-                className="text-xs px-2 py-1 rounded"
-                style={{
-                  backgroundColor: 'var(--color-background)',
-                  color: 'var(--color-text-secondary)',
-                }}
-              >
-                Esci
-              </button>
             </div>
             <button
               onClick={() => setShowPanel(false)}
@@ -890,41 +872,43 @@ export function AdminPanel() {
         </div>
       )}
 
-      <div className="fixed bottom-4 left-4 z-[1300]">
-        <button
-          type="button"
-          onClick={() => {
-            const next = !editHandlesEnabled;
-            setEditHandlesEnabled(next);
-            if (!next) {
-              setShowPanel(false);
-            }
-          }}
-          className="flex items-center gap-3 rounded-full px-4 py-3 shadow-lg transition-transform hover:scale-105"
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            color: 'var(--color-text)',
-            border: '1px solid var(--color-border)',
-          }}
-          aria-pressed={editHandlesEnabled}
-          aria-label="Abilita o disabilita edit handles"
-        >
-          <span className="text-sm font-medium">Edit Handles</span>
-          <span
-            className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-            style={{
-              backgroundColor: editHandlesEnabled ? 'var(--color-primary)' : 'var(--color-border)',
+      {canShowEditHandlesToggle && (
+        <div className="fixed bottom-4 left-4 z-[1300]">
+          <button
+            type="button"
+            onClick={() => {
+              const next = !editHandlesEnabled;
+              setEditHandlesEnabled(next);
+              if (!next) {
+                setShowPanel(false);
+              }
             }}
+            className="flex items-center gap-3 rounded-full px-4 py-3 shadow-lg transition-transform hover:scale-105"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              color: 'var(--color-text)',
+              border: '1px solid var(--color-border)',
+            }}
+            aria-pressed={editHandlesEnabled}
+            aria-label="Abilita o disabilita edit handles"
           >
+            <span className="text-sm font-medium">Edit Handles</span>
             <span
-              className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+              className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
               style={{
-                transform: editHandlesEnabled ? 'translateX(22px)' : 'translateX(4px)',
+                backgroundColor: editHandlesEnabled ? 'var(--color-primary)' : 'var(--color-border)',
               }}
-            />
-          </span>
-        </button>
-      </div>
+            >
+              <span
+                className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                style={{
+                  transform: editHandlesEnabled ? 'translateX(22px)' : 'translateX(4px)',
+                }}
+              />
+            </span>
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -1113,44 +1097,22 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
 }
 
 function ThemeEditor() {
-  const { theme, setTheme, availableThemes } = useTheme();
+  const { theme, setTheme, updateTheme, availableThemes } = useTheme();
   const { menu, updateMenu, site, currentProjectName } = useAdmin();
   const [customTheme, setCustomTheme] = useState(theme);
-  const [themeName, setThemeName] = useState('');
   const projectFileName = buildProjectFileName(currentProjectName || localStorage.getItem(PROJECT_NAME_STORAGE_KEY) || 'site');
 
   useEffect(() => {
-    const root = document.documentElement;
-    const typography = { ...DEFAULT_TYPOGRAPHY, ...(customTheme.typography || {}) };
-    const spacing = { ...DEFAULT_SPACING, ...(customTheme.spacing || {}) };
-    Object.entries(customTheme.colors).forEach(([key, value]) => {
-      const cssVar = '--color-' + key.replace(/([A-Z])/g, '-$1').toLowerCase();
-      root.style.setProperty(cssVar, value);
-    });
-    root.style.setProperty('--font-heading', customTheme.fonts.heading);
-    root.style.setProperty('--font-body', customTheme.fonts.body);
-    root.style.setProperty('--font-site-title', customTheme.fonts.heading);
-    root.style.setProperty('--size-site-title', typography.siteTitleSize);
-    root.style.setProperty('--font-nav', customTheme.fonts.body);
-    root.style.setProperty('--size-nav', typography.navSize);
-    root.style.setProperty('--font-h1', customTheme.fonts.heading);
-    root.style.setProperty('--size-h1', typography.h1Size);
-    root.style.setProperty('--font-h2', customTheme.fonts.heading);
-    root.style.setProperty('--size-h2', typography.h2Size);
-    root.style.setProperty('--font-h3', customTheme.fonts.heading);
-    root.style.setProperty('--size-h3', typography.h3Size);
-    root.style.setProperty('--font-body-copy', customTheme.fonts.body);
-    root.style.setProperty('--size-body-copy', typography.bodySize);
-    root.style.setProperty('--container-width', spacing.container);
-    root.style.setProperty('--section-spacing', spacing.section);
-    root.dataset.cmsDensity = spacing.density;
-    root.style.setProperty('--logo-url', `url(${customTheme.logo})`);
-    root.style.setProperty('--header-background', `url(${customTheme.headerBackground})`);
-    root.style.setProperty('--footer-background', `url(${customTheme.footerBackground})`);
-  }, [customTheme]);
+    setCustomTheme(theme);
+  }, [theme]);
+
+  const applyThemeUpdate = (nextTheme: any) => {
+    setCustomTheme(nextTheme);
+    updateTheme(nextTheme);
+  };
 
   const handleColorChange = (key: keyof typeof theme.colors, value: string) => {
-    setCustomTheme({
+    applyThemeUpdate({
       ...customTheme,
       colors: {
         ...customTheme.colors,
@@ -1160,14 +1122,14 @@ function ThemeEditor() {
   };
 
   const handleImageChange = (key: 'logo' | 'headerBackground' | 'footerBackground', value: string) => {
-    setCustomTheme({
+    applyThemeUpdate({
       ...customTheme,
       [key]: value,
     });
   };
 
   const handleTypographyChange = (key: string, value: string) => {
-    setCustomTheme({
+    applyThemeUpdate({
       ...customTheme,
       typography: {
         ...DEFAULT_TYPOGRAPHY,
@@ -1178,7 +1140,7 @@ function ThemeEditor() {
   };
 
   const handleSpacingChange = (key: 'container' | 'section' | 'density', value: string) => {
-    setCustomTheme({
+    applyThemeUpdate({
       ...customTheme,
       spacing: {
         ...DEFAULT_SPACING,
@@ -1192,33 +1154,6 @@ function ThemeEditor() {
     const newMenu = JSON.parse(JSON.stringify(menu));
     newMenu.logo = value;
     updateMenu(newMenu);
-  };
-
-  const handleSave = () => {
-    if (!themeName) {
-      alert('Inserisci un nome per il tema');
-      return;
-    }
-    
-    const savedThemes = JSON.parse(localStorage.getItem('cms-custom-themes') || '[]');
-    const newTheme = {
-      ...customTheme,
-      id: themeName.toLowerCase().replace(/\s+/g, '-'),
-      name: themeName,
-    };
-    savedThemes.push(newTheme);
-    localStorage.setItem('cms-custom-themes', JSON.stringify(savedThemes));
-    alert('Tema salvato! Ricarica la pagina per vederlo nella lista.');
-    setThemeName('');
-  };
-
-  const handleExport = () => {
-    const blob = new Blob([JSON.stringify(customTheme, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'custom-theme.json';
-    a.click();
   };
 
   const typography = { ...DEFAULT_TYPOGRAPHY, ...(customTheme.typography || {}) };
@@ -1254,7 +1189,7 @@ function ThemeEditor() {
         <select
           value={customTheme.fonts.body}
           onChange={(e) =>
-            setCustomTheme({
+            applyThemeUpdate({
               ...customTheme,
               fonts: {
                 heading: e.target.value,
@@ -1287,7 +1222,9 @@ function ThemeEditor() {
           onChange={(e) => {
             setTheme(e.target.value);
             const selected = availableThemes.find(t => t.id === e.target.value);
-            if (selected) setCustomTheme(selected);
+            if (selected) {
+              applyThemeUpdate(selected);
+            }
           }}
           className="w-full px-3 py-2 rounded"
           style={{
@@ -1530,48 +1467,6 @@ function ThemeEditor() {
             />
           </div>
         ))}
-      </div>
-
-      <div className="flex gap-2">
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-2 px-3 py-2 rounded text-sm"
-          style={{
-            backgroundColor: 'var(--color-background)',
-            color: 'var(--color-text)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <Download className="w-4 h-4" />
-          Esporta
-        </button>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
-          Salva Tema Personalizzato
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={themeName}
-            onChange={(e) => setThemeName(e.target.value)}
-            placeholder="Nome tema..."
-            className="flex-1 px-3 py-2 rounded text-sm"
-            style={{
-              backgroundColor: 'var(--color-background)',
-              color: 'var(--color-text)',
-              border: '1px solid var(--color-border)',
-            }}
-          />
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 rounded text-sm font-medium"
-            style={{ backgroundColor: 'var(--color-secondary)', color: '#ffffff' }}
-          >
-            <Save className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
     </div>

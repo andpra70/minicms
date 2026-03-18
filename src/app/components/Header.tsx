@@ -16,6 +16,7 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [draggedMenu, setDraggedMenu] = useState<{ level: 'top' | 'child'; parentId?: string; itemId: string } | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<{ level: 'top' | 'child'; itemId: string; parentId?: string; position: 'before' | 'after' } | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, setTheme, availableThemes } = useTheme();
@@ -40,15 +41,17 @@ export function Header() {
     return allItems.some((item) => item.id === id || item.path === path);
   };
 
-  const reorderById = (items: any[], fromId: string, toId: string) => {
+  const reorderById = (items: any[], fromId: string, toId: string, position: 'before' | 'after') => {
     const fromIndex = items.findIndex((item) => item.id === fromId);
     const toIndex = items.findIndex((item) => item.id === toId);
-    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) {
+    if (fromIndex < 0 || toIndex < 0) {
       return items;
     }
     const next = [...items];
     const [moved] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, moved);
+    const targetIndex = position === 'after' ? toIndex + 1 : toIndex;
+    const adjustedIndex = fromIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    next.splice(adjustedIndex, 0, moved);
     return next;
   };
 
@@ -72,19 +75,19 @@ export function Header() {
     }
   };
 
-  const moveTopMenuItem = (fromId: string, toId: string) => {
+  const moveTopMenuItem = (fromId: string, toId: string, position: 'before' | 'after') => {
     const newMenu = JSON.parse(JSON.stringify(menu));
-    newMenu.items = reorderById(newMenu.items || [], fromId, toId);
+    newMenu.items = reorderById(newMenu.items || [], fromId, toId, position);
     updateMenu(newMenu);
   };
 
-  const moveChildMenuItem = (parentId: string, fromId: string, toId: string) => {
+  const moveChildMenuItem = (parentId: string, fromId: string, toId: string, position: 'before' | 'after') => {
     const newMenu = JSON.parse(JSON.stringify(menu));
     const parent = (newMenu.items || []).find((item: any) => item.id === parentId);
     if (!parent || !Array.isArray(parent.children)) {
       return;
     }
-    parent.children = reorderById(parent.children, fromId, toId);
+    parent.children = reorderById(parent.children, fromId, toId, position);
     updateMenu(newMenu);
   };
 
@@ -266,6 +269,13 @@ export function Header() {
     }
   };
 
+  const getDropPosition = (e: DragEvent<HTMLElement>, axis: 'x' | 'y') => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const cursor = axis === 'x' ? e.clientX - rect.left : e.clientY - rect.top;
+    const size = axis === 'x' ? rect.width : rect.height;
+    return cursor < size / 2 ? 'before' : 'after';
+  };
+
   return (
     <header
       className="sticky top-0 z-[1200] backdrop-blur-sm relative"
@@ -312,16 +322,34 @@ export function Header() {
                 onDragStart={(e) => handleDragStart(e, { level: 'top', itemId: item.id })}
                 onDragEnd={() => setDraggedMenu(null)}
                 onDragOver={(e) => {
-                  if (canEdit) e.preventDefault();
+                  if (canEdit) {
+                    e.preventDefault();
+                    setDropIndicator({ level: 'top', itemId: item.id, position: getDropPosition(e, 'x') });
+                  }
                 }}
                 onDrop={(e) => {
                   if (!canEdit) return;
                   e.preventDefault();
                   const payload = readDragPayload(e);
                   if (payload?.level === 'top') {
-                    moveTopMenuItem(payload.itemId, item.id);
+                    moveTopMenuItem(payload.itemId, item.id, getDropPosition(e, 'x'));
                     setDraggedMenu(null);
+                    setDropIndicator(null);
                   }
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                    setDropIndicator((current) => (current?.level === 'top' && current.itemId === item.id ? null : current));
+                  }
+                }}
+                style={{
+                  boxShadow:
+                    dropIndicator?.level === 'top' && dropIndicator.itemId === item.id
+                      ? dropIndicator.position === 'before'
+                        ? 'inset 3px 0 0 var(--color-primary)'
+                        : 'inset -3px 0 0 var(--color-primary)'
+                      : undefined,
+                  borderRadius: '8px',
                 }}
               >
                 <Link
@@ -402,16 +430,37 @@ export function Header() {
                           onDragStart={(e) => handleDragStart(e, { level: 'child', parentId: item.id, itemId: child.id })}
                           onDragEnd={() => setDraggedMenu(null)}
                           onDragOver={(e) => {
-                            if (canEdit) e.preventDefault();
+                            if (canEdit) {
+                              e.preventDefault();
+                              setDropIndicator({ level: 'child', parentId: item.id, itemId: child.id, position: getDropPosition(e, 'y') });
+                            }
                           }}
                           onDrop={(e) => {
                             if (!canEdit) return;
                             e.preventDefault();
                             const payload = readDragPayload(e);
                             if (payload?.level === 'child' && payload.parentId === item.id) {
-                              moveChildMenuItem(item.id, payload.itemId, child.id);
+                              moveChildMenuItem(item.id, payload.itemId, child.id, getDropPosition(e, 'y'));
                               setDraggedMenu(null);
+                              setDropIndicator(null);
                             }
+                          }}
+                          onDragLeave={(e) => {
+                            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                              setDropIndicator((current) => (
+                                current?.level === 'child' && current.itemId === child.id && current.parentId === item.id ? null : current
+                              ));
+                            }
+                          }}
+                          style={{
+                            boxShadow:
+                              dropIndicator?.level === 'child' &&
+                              dropIndicator.itemId === child.id &&
+                              dropIndicator.parentId === item.id
+                                ? dropIndicator.position === 'before'
+                                  ? 'inset 0 3px 0 var(--color-primary)'
+                                  : 'inset 0 -3px 0 var(--color-primary)'
+                                : undefined,
                           }}
                         >
                           <Link
@@ -542,16 +591,34 @@ export function Header() {
                 onDragStart={(e) => handleDragStart(e, { level: 'top', itemId: item.id })}
                 onDragEnd={() => setDraggedMenu(null)}
                 onDragOver={(e) => {
-                  if (canEdit) e.preventDefault();
+                  if (canEdit) {
+                    e.preventDefault();
+                    setDropIndicator({ level: 'top', itemId: item.id, position: getDropPosition(e, 'y') });
+                  }
                 }}
                 onDrop={(e) => {
                   if (!canEdit) return;
                   e.preventDefault();
                   const payload = readDragPayload(e);
                   if (payload?.level === 'top') {
-                    moveTopMenuItem(payload.itemId, item.id);
+                    moveTopMenuItem(payload.itemId, item.id, getDropPosition(e, 'y'));
                     setDraggedMenu(null);
+                    setDropIndicator(null);
                   }
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                    setDropIndicator((current) => (current?.level === 'top' && current.itemId === item.id ? null : current));
+                  }
+                }}
+                style={{
+                  boxShadow:
+                    dropIndicator?.level === 'top' && dropIndicator.itemId === item.id
+                      ? dropIndicator.position === 'before'
+                        ? 'inset 0 3px 0 var(--color-primary)'
+                        : 'inset 0 -3px 0 var(--color-primary)'
+                      : undefined,
+                  borderRadius: '8px',
                 }}
               >
                 <div className="flex items-center gap-2">
@@ -621,16 +688,38 @@ export function Header() {
                     onDragStart={(e) => handleDragStart(e, { level: 'child', parentId: item.id, itemId: child.id })}
                     onDragEnd={() => setDraggedMenu(null)}
                     onDragOver={(e) => {
-                      if (canEdit) e.preventDefault();
+                      if (canEdit) {
+                        e.preventDefault();
+                        setDropIndicator({ level: 'child', parentId: item.id, itemId: child.id, position: getDropPosition(e, 'y') });
+                      }
                     }}
                     onDrop={(e) => {
                       if (!canEdit) return;
                       e.preventDefault();
                       const payload = readDragPayload(e);
                       if (payload?.level === 'child' && payload.parentId === item.id) {
-                        moveChildMenuItem(item.id, payload.itemId, child.id);
+                        moveChildMenuItem(item.id, payload.itemId, child.id, getDropPosition(e, 'y'));
                         setDraggedMenu(null);
+                        setDropIndicator(null);
                       }
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                        setDropIndicator((current) => (
+                          current?.level === 'child' && current.itemId === child.id && current.parentId === item.id ? null : current
+                        ));
+                      }
+                    }}
+                    style={{
+                      boxShadow:
+                        dropIndicator?.level === 'child' &&
+                        dropIndicator.itemId === child.id &&
+                        dropIndicator.parentId === item.id
+                          ? dropIndicator.position === 'before'
+                            ? 'inset 0 3px 0 var(--color-primary)'
+                            : 'inset 0 -3px 0 var(--color-primary)'
+                          : undefined,
+                      borderRadius: '8px',
                     }}
                   >
                     <Link

@@ -11,8 +11,8 @@ export default function App() {
   const projectName = getProjectNameFromUrl();
 
   return (
-    <ThemeProvider>
-      <AdminProvider key={projectName || 'default-project'} projectName={projectName}>
+    <AdminProvider key={projectName || 'default-project'} projectName={projectName}>
+      <ThemeProvider>
         <HashRouter>
           <div 
             className="min-h-screen flex flex-col transition-colors duration-300"
@@ -32,7 +32,7 @@ export default function App() {
             <AdminPanel />
           </div>
         </HashRouter>
-      </AdminProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </AdminProvider>
   );
 }

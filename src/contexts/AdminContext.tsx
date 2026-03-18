@@ -27,6 +27,7 @@ type SiteData = {
   items: any[];
   pages: Record<string, any>;
   gallery: any[];
+  theme?: any;
   footer?: {
     line1?: string;
     line2?: string;
@@ -72,6 +73,7 @@ function normalizeSite(input: any, fallback: SiteData = EMPTY_SITE): SiteData {
     items: Array.isArray(input?.items) ? input.items : fallback.items || [],
     pages: input?.pages || fallback.pages || {},
     gallery: Array.isArray(input?.gallery) ? input.gallery : fallback.gallery || [],
+    theme: input?.theme || fallback.theme,
     footer: input?.footer || fallback.footer,
   };
 }

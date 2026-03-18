@@ -1,4 +1,22 @@
 const PROJECT_QUERY_PARAM = 'project';
+const EDIT_QUERY_PARAM = 'edit';
+
+function getSearchParamsFromLocation(locationLike: Pick<Location, 'search'> & Partial<Pick<Location, 'hash'>>) {
+  const params = new URLSearchParams(locationLike.search);
+  const hash = typeof locationLike.hash === 'string' ? locationLike.hash : '';
+  const hashQueryIndex = hash.indexOf('?');
+
+  if (hashQueryIndex >= 0) {
+    const hashParams = new URLSearchParams(hash.slice(hashQueryIndex + 1));
+    hashParams.forEach((value, key) => {
+      if (!params.has(key)) {
+        params.set(key, value);
+      }
+    });
+  }
+
+  return params;
+}
 
 export function sanitizeProjectName(value: string) {
   const cleaned = String(value || '')
@@ -12,7 +30,7 @@ export function sanitizeProjectName(value: string) {
 }
 
 export function getProjectNameFromUrl(locationLike: Pick<Location, 'pathname' | 'search'> = window.location) {
-  const searchParams = new URLSearchParams(locationLike.search);
+  const searchParams = getSearchParamsFromLocation(locationLike);
   const queryProject = searchParams.get(PROJECT_QUERY_PARAM);
   if (queryProject) {
     return sanitizeProjectName(queryProject);
@@ -24,6 +42,10 @@ export function getProjectNameFromUrl(locationLike: Pick<Location, 'pathname' | 
   }
 
   return null;
+}
+
+export function hasEditModeFromUrl(locationLike: Pick<Location, 'search'> & Partial<Pick<Location, 'hash'>> = window.location) {
+  return getSearchParamsFromLocation(locationLike).get(EDIT_QUERY_PARAM) === '1';
 }
 
 export function buildProjectFileName(projectName: string) {

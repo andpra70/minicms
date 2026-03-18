@@ -5,7 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { themes } from '@/themes/themes';
 import { resolveAppAssetUrl } from '@/app/lib/urls';
 import { loadTextFromFileserver, saveTextToFileserver } from '@/app/lib/fileserver';
-import { buildProjectFileName, setProjectUrl } from '@/app/lib/project-route';
+import { buildProjectFileName, hasEditModeFromUrl, setProjectUrl } from '@/app/lib/project-route';
 import { optimizeImageFile } from '@/app/lib/image-upload';
 
 const LOCAL_IMAGE_OPTIONS = [
@@ -949,11 +949,11 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
 }
 
 export function AdminPanel() {
-  const { isAdmin, setIsAdmin, site, updateSite, editHandlesEnabled, setEditHandlesEnabled } = useAdmin();
+  const { isAdmin, site, updateSite, editHandlesEnabled, setEditHandlesEnabled } = useAdmin();
   const [showPanel, setShowPanel] = useState(false);
-  const canShowEditHandlesToggle = new URLSearchParams(window.location.search).get('edit') === '1';
+  const canShowEditHandlesToggle = hasEditModeFromUrl();
 
-  if (!isAdmin) {
+  if (!isAdmin && !canShowEditHandlesToggle) {
     return null;
   }
 

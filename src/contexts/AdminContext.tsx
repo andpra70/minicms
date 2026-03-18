@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { loadTextFromFileserver } from '@/app/lib/fileserver';
-import { buildProjectFileName } from '@/app/lib/project-route';
+import { buildProjectFileName, hasEditModeFromUrl } from '@/app/lib/project-route';
 
 interface AdminContextType {
   isAdmin: boolean;
@@ -132,7 +132,7 @@ export function AdminProvider({
 }) {
   const [bootState] = useState(() => getBootState(projectName));
   const [isAdmin, setIsAdminState] = useState<boolean>(() => {
-    return localStorage.getItem('cms-admin-mode') === 'true';
+    return hasEditModeFromUrl() || localStorage.getItem('cms-admin-mode') === 'true';
   });
   const [editHandlesEnabled, setEditHandlesEnabledState] = useState<boolean>(() => {
     const raw = localStorage.getItem('cms-edit-handles-enabled');
@@ -212,6 +212,12 @@ export function AdminProvider({
   useEffect(() => {
     setLocalStorageSafely('cms-admin-mode', isAdmin.toString());
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (hasEditModeFromUrl()) {
+      setIsAdminState(true);
+    }
+  }, []);
 
   useEffect(() => {
     setLocalStorageSafely('cms-edit-handles-enabled', editHandlesEnabled.toString());

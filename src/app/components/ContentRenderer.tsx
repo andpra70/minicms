@@ -1296,7 +1296,7 @@ function PlaceSection({
   sectionPath,
 }: any) {
   const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
-  const { content, updateContent } = useAdmin();
+  const { canEdit, content, updateContent } = useAdmin();
   const [runtimeCoords, setRuntimeCoords] = useState<{ lat: number; lng: number } | null>(
     typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : null,
   );
@@ -1445,68 +1445,41 @@ function PlaceSection({
   }, []);
 
   return (
-    <div className="grid gap-8 md:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.1fr)] items-start">
-      <div className="space-y-4">
-        <h2
-          className="text-3xl font-bold"
+    <div className="space-y-6">
+      <h2
+        className="text-3xl font-bold"
+        style={{
+          color: 'var(--color-text)',
+          fontFamily: 'var(--font-h2)',
+          fontSize: 'var(--size-h2)',
+        }}
+      >
+        <InlineEditor
+          value={title}
+          path={[...basePath, 'title']}
+        />
+      </h2>
+      <div
+        className="inline-flex max-w-full items-start gap-3 rounded-lg px-4 py-3"
+        style={{
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <MapPin className="w-5 h-5 mt-0.5 shrink-0" style={{ color: 'var(--color-primary)' }} />
+        <div
           style={{
             color: 'var(--color-text)',
-            fontFamily: 'var(--font-h2)',
-            fontSize: 'var(--size-h2)',
-          }}
-        >
-          <InlineEditor
-            value={title}
-            path={[...basePath, 'title']}
-          />
-        </h2>
-        <div
-          className="inline-flex items-start gap-3 rounded-lg px-4 py-3"
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <MapPin className="w-5 h-5 mt-0.5 shrink-0" style={{ color: 'var(--color-primary)' }} />
-          <div
-            style={{
-              color: 'var(--color-text)',
-              fontFamily: 'var(--font-body-copy)',
-              fontSize: 'var(--size-body-copy)',
-            }}
-          >
-            <InlineEditor
-              value={address}
-              type="textarea"
-              path={[...basePath, 'address']}
-            />
-          </div>
-        </div>
-        <p
-          style={{
-            color: 'var(--color-text-secondary)',
             fontFamily: 'var(--font-body-copy)',
             fontSize: 'var(--size-body-copy)',
           }}
         >
           <InlineEditor
-            value={description}
+            value={address}
             type="textarea"
-            path={[...basePath, 'description']}
+            path={[...basePath, 'address']}
           />
-        </p>
-        {mapError && (
-          <div
-            className="rounded-lg px-4 py-3 text-sm"
-            style={{
-              backgroundColor: '#fee',
-              color: '#b42318',
-              border: '1px solid #fda29b',
-            }}
-          >
-            {mapError}
-          </div>
-        )}
+        </div>
       </div>
       <div
         className="overflow-hidden rounded-lg"
@@ -1527,6 +1500,35 @@ function PlaceSection({
           >
             Inserisci un indirizzo valido per visualizzare la mappa.
           </div>
+        )}
+      </div>
+      {mapError && (
+        <div
+          className="rounded-lg px-4 py-3 text-sm"
+          style={{
+            backgroundColor: '#fee',
+            color: '#b42318',
+            border: '1px solid #fda29b',
+          }}
+        >
+          {mapError}
+        </div>
+      )}
+      <div
+        style={{
+          color: 'var(--color-text-secondary)',
+          fontFamily: 'var(--font-body-copy)',
+          fontSize: 'var(--size-body-copy)',
+        }}
+      >
+        {canEdit ? (
+          <InlineEditor
+            value={description}
+            type="textarea"
+            path={[...basePath, 'description']}
+          />
+        ) : (
+          renderMarkdownText(description)
         )}
       </div>
     </div>

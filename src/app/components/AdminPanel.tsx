@@ -60,6 +60,115 @@ const DEFAULT_SPACING = {
 
 const PROJECT_NAME_STORAGE_KEY = 'cms-project-name';
 
+function getProjectBaseUrl(projectName: string) {
+  const url = new URL(window.location.href);
+  url.hash = '';
+  url.search = '';
+
+  const normalizedProjectName = String(projectName || '').trim();
+  if (!normalizedProjectName) {
+    return url.toString().replace(/\/$/, '');
+  }
+
+  if (url.pathname.match(/\/project\/[^/]+/i)) {
+    url.pathname = url.pathname.replace(/\/project\/[^/]+/i, `/project/${normalizedProjectName}`);
+  } else if (!url.pathname.endsWith(`/${normalizedProjectName}`)) {
+    url.pathname = `${url.pathname.replace(/\/$/, '')}/${normalizedProjectName}`;
+  }
+
+  return url.toString().replace(/\/$/, '');
+}
+
+function normalizeSitemapBaseUrl(value: string) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  try {
+    const url = new URL(trimmed);
+    url.hash = '';
+    url.search = '';
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+
+function flattenMenuItems(items: any[]): any[] {
+  return (Array.isArray(items) ? items : []).flatMap((item) => [item, ...flattenMenuItems(item?.children || [])]);
+}
+
+function normalizeSitemapPath(value: string) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed || trimmed === '/') {
+    return '/';
+  }
+
+  const withoutHash = trimmed.split('#')[0] || trimmed;
+  const withoutQuery = withoutHash.split('?')[0] || withoutHash;
+  const withLeadingSlash = withoutQuery.startsWith('/') ? withoutQuery : `/${withoutQuery}`;
+  return withLeadingSlash.replace(/\/+/g, '/');
+}
+
+function collectSitemapPaths(menuItems: any[], pages: Record<string, any>) {
+  const paths = new Set<string>(['/']);
+
+  flattenMenuItems(menuItems).forEach((item) => {
+    const normalizedPath = normalizeSitemapPath(item?.path || '');
+    if (normalizedPath) {
+      paths.add(normalizedPath);
+    }
+  });
+
+  Object.keys(pages || {}).forEach((pageId) => {
+    paths.add(pageId === 'home' ? '/' : normalizeSitemapPath(pageId));
+  });
+
+  return Array.from(paths).sort((a, b) => {
+    if (a === '/') return -1;
+    if (b === '/') return 1;
+    return a.localeCompare(b);
+  });
+}
+
+function escapeXml(value: string) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function buildSitemapXml(baseUrl: string, menuItems: any[], pages: Record<string, any>) {
+  const normalizedBaseUrl = normalizeSitemapBaseUrl(baseUrl);
+  if (!normalizedBaseUrl) {
+    throw new Error('Base URL non valido');
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const urls = collectSitemapPaths(menuItems, pages)
+    .map((path) => {
+      const loc = path === '/' ? normalizedBaseUrl : `${normalizedBaseUrl}${path}`;
+      return [
+        '  <url>',
+        `    <loc>${escapeXml(loc)}</loc>`,
+        `    <lastmod>${today}</lastmod>`,
+        '  </url>',
+      ].join('\n');
+    })
+    .join('\n');
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    urls,
+    '</urlset>',
+    '',
+  ].join('\n');
+}
+
 function formatProjectBytes(bytes: number) {
   if (bytes < 1024) {
     return `${bytes} B`;
@@ -1180,6 +1289,7 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { currentProjectName } = useAdmin();
   const [projectName, setProjectName] = useState(() => currentProjectName || localStorage.getItem(PROJECT_NAME_STORAGE_KEY) || 'site');
+  const [sitemapBaseUrl, setSitemapBaseUrl] = useState(() => normalizeSitemapBaseUrl(site?.seo?.baseUrl || getProjectBaseUrl(currentProjectName || localStorage.getItem(PROJECT_NAME_STORAGE_KEY) || 'site')));
 
   const fileName = buildProjectFileName(projectName);
   const closeMenu = () => setIsMenuOpen(false);
@@ -1190,6 +1300,24 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
     if (url.searchParams.has('project') || /\/project\/[^/]+/i.test(url.pathname)) {
       setProjectUrl(value);
     }
+  };
+
+  useEffect(() => {
+    setSitemapBaseUrl(
+      normalizeSitemapBaseUrl(site?.seo?.baseUrl || getProjectBaseUrl(projectName))
+    );
+  }, [site?.seo?.baseUrl, projectName]);
+
+  const persistSitemapBaseUrl = (value: string) => {
+    const nextValue = normalizeSitemapBaseUrl(value);
+    setSitemapBaseUrl(value);
+    updateSite({
+      ...(site || {}),
+      seo: {
+        ...(site?.seo || {}),
+        baseUrl: nextValue,
+      },
+    });
   };
 
   const handleDownload = () => {
@@ -1231,6 +1359,25 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
       console.error('Errore caricamento fileserver:', error);
       setError(error instanceof Error && error.message.includes('JSON') ? 'JSON non valido nel file caricato' : '');
       alert(`Caricamento da fileserver fallito: ${error instanceof Error ? error.message : 'errore sconosciuto'}`);
+    }
+  };
+
+  const handleGenerateSitemap = () => {
+    try {
+      const baseUrl = normalizeSitemapBaseUrl(sitemapBaseUrl);
+      const xml = buildSitemapXml(baseUrl, site?.items || [], site?.pages || {});
+      const blob = new Blob([xml], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sitemap.xml';
+      a.click();
+      URL.revokeObjectURL(url);
+      closeMenu();
+      toast.success('Sitemap XML generata');
+    } catch (nextError) {
+      console.error('Errore generazione sitemap:', nextError);
+      toast.error(nextError instanceof Error ? nextError.message : 'Errore generazione sitemap');
     }
   };
 
@@ -1285,6 +1432,27 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
             File: {fileName}
           </div>
         </div>
+        <div className="flex flex-col gap-1 px-1 pb-1">
+          <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+            Base URL sitemap
+          </label>
+          <input
+            type="url"
+            value={sitemapBaseUrl}
+            onChange={(e) => setSitemapBaseUrl(e.target.value)}
+            onBlur={(e) => persistSitemapBaseUrl(e.target.value)}
+            className="w-full px-2 py-2 rounded text-sm"
+            style={{
+              backgroundColor: 'var(--color-background)',
+              color: 'var(--color-text)',
+              border: '1px solid var(--color-border)',
+            }}
+            placeholder="https://www.example.com"
+          />
+          <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+            Usa URL assoluto del sito pubblico.
+          </div>
+        </div>
         <button
           onClick={handleDownload}
           className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm"
@@ -1298,6 +1466,20 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
         >
           <Download className="w-4 h-4" />
           Esporta
+        </button>
+        <button
+          onClick={handleGenerateSitemap}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm"
+          style={{
+            backgroundColor: 'var(--color-background)',
+            color: 'var(--color-text)',
+            border: '1px solid var(--color-border)',
+          }}
+          title="Genera sitemap XML"
+          aria-label="Genera sitemap XML"
+        >
+          <Download className="w-4 h-4" />
+          Sitemap XML
         </button>
         <label
           className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm cursor-pointer"

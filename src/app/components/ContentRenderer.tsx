@@ -22,6 +22,8 @@ interface ContentRendererProps {
 const SECTION_TYPE_OPTIONS = [
   'hero',
   'content',
+  'content-text',
+  'content-image',
   'features',
   'services-list',
   'blog-list',
@@ -402,6 +404,8 @@ function getSectionLabel(type: string) {
   const labels: Record<string, string> = {
     hero: 'Hero',
     content: 'Contenuto',
+    'content-text': 'Contenuto testo',
+    'content-image': 'Contenuto immagine',
     features: 'Features',
     'services-list': 'Servizi',
     'blog-list': 'Blog',
@@ -440,6 +444,22 @@ function createSectionTemplate(type: string) {
         type: 'features',
         title: 'Nuove caratteristiche',
         items: [createItemTemplate('features')],
+      };
+    case 'content-text':
+      return {
+        type: 'content-text',
+        title: 'Nuova sezione testo',
+        content: 'Testo in **markdown** della sezione.',
+      };
+    case 'content-image':
+      return {
+        type: 'content-image',
+        image: defaultImage,
+        imageHeight: 256,
+        imagePosX: 50,
+        imagePosY: 50,
+        imageScale: 100,
+        caption: 'Caption immagine',
       };
     case 'services-list':
       return {
@@ -592,6 +612,10 @@ function SectionRenderer({
       return <FeaturesSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'content':
       return <ContentSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
+    case 'content-text':
+      return <ContentTextSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
+    case 'content-image':
+      return <ContentImageSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'services-list':
       return <ServicesListSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'blog-list':
@@ -1909,6 +1933,90 @@ function ContentSection({
         <div className={`${textOrderMobile} ${textOrderDesktop}`}>
           {textBlock}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ContentTextSection({
+  title,
+  content,
+  pageId,
+  sectionIndex,
+  sectionPath,
+}: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
+  const { canEdit } = useAdmin();
+
+  return (
+    <div className="space-y-6">
+      <h2
+        className="text-3xl font-bold"
+        style={{
+          color: 'var(--color-text)',
+          fontFamily: 'var(--font-h2)',
+          fontSize: 'var(--size-h2)',
+        }}
+      >
+        <InlineEditor value={title} path={[...basePath, 'title']} />
+      </h2>
+      <div
+        style={{
+          color: 'var(--color-text-secondary)',
+          fontFamily: 'var(--font-body-copy)',
+          fontSize: 'var(--size-body-copy)',
+        }}
+      >
+        {canEdit ? (
+          <InlineEditor value={content} type="textarea" path={[...basePath, 'content']} />
+        ) : (
+          renderMarkdownText(content)
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ContentImageSection({
+  image,
+  imageHeight = 256,
+  imagePosX = 50,
+  imagePosY = 50,
+  imageScale = 100,
+  caption,
+  pageId,
+  sectionIndex,
+  sectionPath,
+}: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
+
+  return (
+    <div className="space-y-4">
+      {image && (
+        <InlineImagePositionEditor
+          src={image}
+          alt={caption || 'Immagine contenuto'}
+          path={[...basePath, 'image']}
+          frameHeightPath={[...basePath, 'imageHeight']}
+          posXPath={[...basePath, 'imagePosX']}
+          posYPath={[...basePath, 'imagePosY']}
+          scalePath={[...basePath, 'imageScale']}
+          frameHeight={imageHeight}
+          posX={imagePosX}
+          posY={imagePosY}
+          scale={imageScale}
+          className="w-full object-cover rounded-lg"
+          style={{ borderRadius: 'var(--border-radius)' }}
+        />
+      )}
+      <div
+        style={{
+          color: 'var(--color-text-secondary)',
+          fontFamily: 'var(--font-body-copy)',
+          fontSize: 'var(--size-body-copy)',
+        }}
+      >
+        <InlineEditor value={caption} type="textarea" path={[...basePath, 'caption']} />
       </div>
     </div>
   );

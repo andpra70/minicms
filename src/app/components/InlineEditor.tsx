@@ -188,7 +188,7 @@ function renderInlineMarkdown(value: string, keyPrefix: string) {
   return parts;
 }
 
-function renderMarkdownText(value: string) {
+export function renderMarkdownText(value: string) {
   const parts: React.ReactNode[] = [];
   const lines = value.split('\n');
 

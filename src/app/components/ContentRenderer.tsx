@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Mail, Phone, MapPin, Plus, X, GripVertical } from 'lucide-react';
-import { InlineEditor, InlineImageEditor, InlineImagePositionEditor } from './InlineEditor';
+import { InlineEditor, InlineImageEditor, InlineImagePositionEditor, renderMarkdownText } from './InlineEditor';
 import { useAdmin } from '@/contexts/AdminContext';
 import { geocodeAddress, loadLeaflet } from '@/app/lib/leaflet';
 import { Calendar } from './ui/calendar';
@@ -556,11 +556,71 @@ function YouTubeSection({ title, description, videoUrl, pageId, sectionIndex }: 
 }
 
 function CalendarSection({ title, description, entries, notes, pageId, sectionIndex }: any) {
-  const { canEdit } = useAdmin();
+  const { canEdit, site, updateSite } = useAdmin();
   const parsed = parseCalendarInput(entries);
+  const events = getSiteEventsSorted(site?.events || []);
+  const eventsByDate = groupEventsByDate(events);
+  const [selectedDateKey, setSelectedDateKey] = useState<string>(() => {
+    const firstEventDate = events[0]?.date;
+    const firstParsedDate = parsed.entries[0]?.type === 'single' ? format(parsed.entries[0].date, 'yyyy-MM-dd') : undefined;
+    return firstEventDate || firstParsedDate || format(new Date(), 'yyyy-MM-dd');
+  });
+
+  useEffect(() => {
+    if (eventsByDate[selectedDateKey]) {
+      return;
+    }
+    const firstEventDate = Object.keys(eventsByDate)[0];
+    if (firstEventDate) {
+      setSelectedDateKey(firstEventDate);
+    }
+  }, [eventsByDate, selectedDateKey]);
+
+  const selectedDateEvents = eventsByDate[selectedDateKey] || [];
+
+  const patchEvents = (nextEvents: SiteEvent[]) => {
+    updateSite({
+      ...site,
+      events: nextEvents.sort(compareEvents),
+    });
+  };
+
+  const handleAddEvent = (date: string) => {
+    const normalizedDate = normalizeEventDate(date);
+    if (!normalizedDate) {
+      return;
+    }
+    patchEvents([...events, createSiteEvent(normalizedDate)]);
+    setSelectedDateKey(normalizedDate);
+  };
+
+  const updateEvent = (eventId: string, patch: Partial<SiteEvent>) => {
+    patchEvents(
+      events.map((event) => {
+        if (event.id !== eventId) {
+          return event;
+        }
+        return {
+          ...event,
+          ...patch,
+          date: normalizeEventDate(patch.date ?? event.date) || event.date,
+          time: normalizeEventTime(patch.time ?? event.time),
+        };
+      }),
+    );
+  };
+
+  const deleteEvent = (eventId: string) => {
+    patchEvents(events.filter((event) => event.id !== eventId));
+  };
+
+  const dayEventCounts = Object.entries(eventsByDate).reduce<Record<string, number>>((acc, [date, dayEvents]) => {
+    acc[date] = dayEvents.length;
+    return acc;
+  }, {});
 
   return (
-    <div className="grid gap-8 md:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.1fr)] items-start">
+    <div className="grid gap-6 md:grid-cols-[minmax(0,0.95fr)_minmax(280px,0.9fr)] items-start">
       <div className="space-y-4">
         <h2
           className="text-3xl font-bold"
@@ -593,7 +653,7 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
             className="mb-2 text-sm font-medium"
             style={{ color: 'var(--color-text)' }}
           >
-            Date evidenziate
+            Date evidenziate manualmente
           </div>
           <InlineEditor
             value={entries}
@@ -623,6 +683,106 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
             </span>
           ))}
         </div>
+        {canEdit && (
+          <div
+            className="rounded-lg p-4"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div className="mb-2 text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+              Eventi del giorno selezionato
+            </div>
+            <div className="mb-3 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+              Click su un giorno del calendario per creare un nuovo evento.
+            </div>
+            <div className="space-y-3">
+              {selectedDateEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="rounded-lg p-3"
+                  style={{
+                    backgroundColor: 'var(--color-background)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <input
+                      type="text"
+                      value={event.title}
+                      onChange={(e) => updateEvent(event.id, { title: e.target.value })}
+                      className="w-full rounded px-3 py-2 text-sm"
+                      style={{
+                        backgroundColor: 'var(--color-surface)',
+                        color: 'var(--color-text)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => deleteEvent(event.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded"
+                      style={{
+                        backgroundColor: 'var(--color-background)',
+                        color: 'var(--color-text)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                      title="Elimina evento"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="mb-2 grid gap-2 sm:grid-cols-2">
+                    <input
+                      type="date"
+                      value={event.date}
+                      onChange={(e) => {
+                        const nextDate = normalizeEventDate(e.target.value);
+                        if (nextDate) {
+                          updateEvent(event.id, { date: nextDate });
+                          setSelectedDateKey(nextDate);
+                        }
+                      }}
+                      className="rounded px-3 py-2 text-sm"
+                      style={{
+                        backgroundColor: 'var(--color-surface)',
+                        color: 'var(--color-text)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                    />
+                    <input
+                      type="time"
+                      value={event.time}
+                      onChange={(e) => updateEvent(event.id, { time: e.target.value })}
+                      className="rounded px-3 py-2 text-sm"
+                      style={{
+                        backgroundColor: 'var(--color-surface)',
+                        color: 'var(--color-text)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                    />
+                  </div>
+                  <textarea
+                    value={event.body}
+                    onChange={(e) => updateEvent(event.id, { body: e.target.value })}
+                    className="min-h-24 w-full rounded px-3 py-2 text-sm"
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  />
+                </div>
+              ))}
+              {selectedDateEvents.length === 0 && (
+                <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                  Nessun evento su {formatEventDateLabel(selectedDateKey)}.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         <p
           style={{
             color: 'var(--color-text-secondary)',
@@ -638,7 +798,7 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
         </p>
       </div>
       <div
-        className="rounded-lg p-4"
+        className="rounded-lg p-3"
         style={{
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
@@ -651,9 +811,189 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
             highlighted: 'bg-primary text-primary-foreground rounded-md font-semibold',
           }}
           classNames={{
+            month: 'flex w-full flex-col gap-2',
+            caption_label: 'text-xs font-semibold',
+            head_cell: 'text-muted-foreground rounded-md flex-1 font-normal text-[0.7rem]',
+            row: 'flex w-full mt-1',
+            day: 'h-10 w-full rounded-md p-0 text-sm font-normal aria-selected:opacity-100',
             day_today: 'bg-accent text-accent-foreground rounded-md',
           }}
+          onDayClick={(day) => {
+            const key = format(day, 'yyyy-MM-dd');
+            setSelectedDateKey(key);
+            if (canEdit) {
+              handleAddEvent(key);
+            }
+          }}
+          components={{
+            DayContent: ({ date }: any) => {
+              const dateKey = format(date, 'yyyy-MM-dd');
+              const count = dayEventCounts[dateKey] || 0;
+              return (
+                <div className="relative flex h-full w-full flex-col items-center justify-center">
+                  <span>{format(date, 'd')}</span>
+                  {count > 0 && (
+                    <span
+                      className="absolute bottom-0.5 right-0.5 inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none"
+                      style={{
+                        backgroundColor: 'var(--color-primary)',
+                        color: '#ffffff',
+                      }}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </div>
+              );
+            },
+          }}
+          className="mx-auto max-w-sm"
         />
+        <div className="mt-3 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+          Eventi creati: {events.length}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EventsListSection({ title, description, pageId, sectionIndex }: any) {
+  const { canEdit, site } = useAdmin();
+  const events = getSiteEventsSorted(site?.events || []);
+  const eventsByDate = groupEventsByDate(events);
+  const orderedDates = Object.keys(eventsByDate).sort();
+  const [selectedDateKey, setSelectedDateKey] = useState<string>(orderedDates[0] || '');
+
+  useEffect(() => {
+    if (orderedDates.length === 0) {
+      if (selectedDateKey !== '') {
+        setSelectedDateKey('');
+      }
+      return;
+    }
+    if (!selectedDateKey || !eventsByDate[selectedDateKey]) {
+      setSelectedDateKey(orderedDates[0]);
+    }
+  }, [orderedDates, selectedDateKey, eventsByDate]);
+
+  const selectedEvents = selectedDateKey ? eventsByDate[selectedDateKey] || [] : [];
+
+  return (
+    <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)] items-start">
+      <div className="space-y-4">
+        <h2
+          className="text-3xl font-bold"
+          style={{
+            color: 'var(--color-text)',
+            fontFamily: 'var(--font-h2)',
+            fontSize: 'var(--size-h2)',
+          }}
+        >
+          <InlineEditor
+            value={title}
+            path={['pages', pageId, 'sections', sectionIndex, 'title']}
+          />
+        </h2>
+        <p
+          style={{
+            color: 'var(--color-text-secondary)',
+            fontFamily: 'var(--font-body-copy)',
+            fontSize: 'var(--size-body-copy)',
+          }}
+        >
+          <InlineEditor
+            value={description}
+            type="textarea"
+            path={['pages', pageId, 'sections', sectionIndex, 'description']}
+          />
+        </p>
+        <div
+          className="rounded-lg p-3"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <div className="mb-3 text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+            Indice date
+          </div>
+          <div className="space-y-2">
+            {orderedDates.map((dateKey) => (
+              <button
+                key={dateKey}
+                type="button"
+                onClick={() => setSelectedDateKey(dateKey)}
+                className="w-full rounded px-3 py-2 text-left text-sm"
+                style={{
+                  backgroundColor: selectedDateKey === dateKey ? 'var(--color-primary)' : 'var(--color-background)',
+                  color: selectedDateKey === dateKey ? '#ffffff' : 'var(--color-text)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                {formatEventDateLabel(dateKey)}
+              </button>
+            ))}
+            {orderedDates.length === 0 && (
+              <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                Nessun evento disponibile.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div
+        className="rounded-lg p-4"
+        style={{
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <div className="mb-4 text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+          {selectedDateKey ? formatEventDateLabel(selectedDateKey) : 'Nessuna data selezionata'}
+        </div>
+        <div className="space-y-4">
+          {selectedEvents.map((event) => (
+            <article
+              key={event.id}
+              className="rounded-lg p-4"
+              style={{
+                backgroundColor: 'var(--color-background)',
+                border: '1px solid var(--color-border)',
+              }}
+            >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h3
+                  className="text-xl font-bold"
+                  style={{
+                    color: 'var(--color-text)',
+                    fontFamily: 'var(--font-h3)',
+                    fontSize: 'var(--size-h3)',
+                  }}
+                >
+                  {event.title}
+                </h3>
+                <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                  {event.time}
+                </span>
+              </div>
+              <div
+                style={{
+                  color: 'var(--color-text-secondary)',
+                  fontFamily: 'var(--font-body-copy)',
+                  fontSize: 'var(--size-body-copy)',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {renderMarkdownText(event.body)}
+              </div>
+            </article>
+          ))}
+          {selectedEvents.length === 0 && (
+            <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+              {canEdit ? 'Crea un evento dal content type Calendario.' : 'Nessun evento in questa data.'}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

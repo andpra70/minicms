@@ -35,6 +35,14 @@ const SECTION_TYPE_OPTIONS = [
   'youtube',
 ] as const;
 
+const COLUMN_WIDTH_OPTIONS = [
+  { value: '', label: 'Auto' },
+  { value: '50%', label: '50%' },
+  { value: '33%', label: '33%' },
+  { value: '25%', label: '25%' },
+  { value: '20%', label: '20%' },
+] as const;
+
 type SiteEvent = {
   id: string;
   title: string;
@@ -477,17 +485,17 @@ function createSectionTemplate(type: string) {
     case 'layout-1col':
       return {
         type: 'layout-1col',
-        columns: [{ sections: [] }],
+        columns: [{ width: '', sections: [] }],
       };
     case 'layout-2col':
       return {
         type: 'layout-2col',
-        columns: [{ sections: [] }, { sections: [] }],
+        columns: [{ width: '50%', sections: [] }, { width: '50%', sections: [] }],
       };
     case 'layout-3col':
       return {
         type: 'layout-3col',
-        columns: [{ sections: [] }, { sections: [] }, { sections: [] }],
+        columns: [{ width: '33%', sections: [] }, { width: '33%', sections: [] }, { width: '33%', sections: [] }],
       };
     case 'youtube':
       return {
@@ -614,18 +622,23 @@ function LayoutColumnsSection({
   sectionIndex,
   sectionPath,
 }: any) {
+  const { canEdit, content, updateContent } = useAdmin();
   const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
   const normalizedColumns = Array.isArray(columns) ? columns : [];
-  const gridClass =
-    type === 'layout-3col'
-      ? 'md:grid-cols-3'
-      : type === 'layout-2col'
-        ? 'md:grid-cols-2'
-        : 'md:grid-cols-1';
+
+  const updateColumnWidth = (columnIndex: number, nextWidth: string) => {
+    const newContent = JSON.parse(JSON.stringify(content));
+    const targetColumn = getValueAtPath(newContent, [...basePath, 'columns', columnIndex]);
+    if (!targetColumn) {
+      return;
+    }
+    targetColumn.width = nextWidth;
+    updateContent(newContent);
+  };
 
   return (
     <div
-      className={`grid gap-6 ${gridClass}`}
+      className="flex flex-col gap-6 md:flex-row"
       style={{
         backgroundColor: 'color-mix(in srgb, var(--color-surface) 55%, transparent)',
         border: '1px dashed var(--color-border)',
@@ -638,14 +651,33 @@ function LayoutColumnsSection({
           key={columnIndex}
           className="rounded-lg p-3"
           style={{
+            flex: column?.width ? `0 1 ${column.width}` : '1 1 0%',
             backgroundColor: 'var(--color-background)',
             border: '1px solid var(--color-border)',
             minHeight: '160px',
           }}
         >
-          <div className="mb-3 text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-            Colonna {columnIndex + 1}
-          </div>
+          {canEdit && (
+            <div className="mb-3 flex justify-end">
+              <select
+                value={String(column?.width || '')}
+                onChange={(event) => updateColumnWidth(columnIndex, event.target.value)}
+                className="rounded px-2 py-1 text-xs"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  color: 'var(--color-text)',
+                  border: '1px solid var(--color-border)',
+                }}
+                aria-label={`Larghezza colonna ${columnIndex + 1}`}
+              >
+                {COLUMN_WIDTH_OPTIONS.map((option) => (
+                  <option key={option.value || 'auto'} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <SectionList
             sections={Array.isArray(column?.sections) ? column.sections : []}
             listPath={[...basePath, 'columns', columnIndex, 'sections']}

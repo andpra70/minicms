@@ -373,6 +373,7 @@ function createSectionTemplate(type: string) {
         type: 'events-list',
         title: 'Lista eventi',
         description: 'Indice per data e dettaglio degli eventi del giorno selezionato.',
+        indexTitle: 'Indice date',
       };
     case 'youtube':
       return {
@@ -576,8 +577,6 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
     }
   }, [eventsByDate, selectedDateKey]);
 
-  const selectedDateEvents = eventsByDate[selectedDateKey] || [];
-
   const patchEvents = (nextEvents: SiteEvent[]) => {
     updateSite({
       ...site,
@@ -592,26 +591,6 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
     }
     patchEvents([...events, createSiteEvent(normalizedDate)]);
     setSelectedDateKey(normalizedDate);
-  };
-
-  const updateEvent = (eventId: string, patch: Partial<SiteEvent>) => {
-    patchEvents(
-      events.map((event) => {
-        if (event.id !== eventId) {
-          return event;
-        }
-        return {
-          ...event,
-          ...patch,
-          date: normalizeEventDate(patch.date ?? event.date) || event.date,
-          time: normalizeEventTime(patch.time ?? event.time),
-        };
-      }),
-    );
-  };
-
-  const deleteEvent = (eventId: string) => {
-    patchEvents(events.filter((event) => event.id !== eventId));
   };
 
   const dayEventCounts = Object.entries(eventsByDate).reduce<Record<string, number>>((acc, [date, dayEvents]) => {
@@ -684,103 +663,8 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
           ))}
         </div>
         {canEdit && (
-          <div
-            className="rounded-lg p-4"
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            <div className="mb-2 text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-              Eventi del giorno selezionato
-            </div>
-            <div className="mb-3 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-              Click su un giorno del calendario per creare un nuovo evento.
-            </div>
-            <div className="space-y-3">
-              {selectedDateEvents.map((event) => (
-                <div
-                  key={event.id}
-                  className="rounded-lg p-3"
-                  style={{
-                    backgroundColor: 'var(--color-background)',
-                    border: '1px solid var(--color-border)',
-                  }}
-                >
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <input
-                      type="text"
-                      value={event.title}
-                      onChange={(e) => updateEvent(event.id, { title: e.target.value })}
-                      className="w-full rounded px-3 py-2 text-sm"
-                      style={{
-                        backgroundColor: 'var(--color-surface)',
-                        color: 'var(--color-text)',
-                        border: '1px solid var(--color-border)',
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => deleteEvent(event.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded"
-                      style={{
-                        backgroundColor: 'var(--color-background)',
-                        color: 'var(--color-text)',
-                        border: '1px solid var(--color-border)',
-                      }}
-                      title="Elimina evento"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="mb-2 grid gap-2 sm:grid-cols-2">
-                    <input
-                      type="date"
-                      value={event.date}
-                      onChange={(e) => {
-                        const nextDate = normalizeEventDate(e.target.value);
-                        if (nextDate) {
-                          updateEvent(event.id, { date: nextDate });
-                          setSelectedDateKey(nextDate);
-                        }
-                      }}
-                      className="rounded px-3 py-2 text-sm"
-                      style={{
-                        backgroundColor: 'var(--color-surface)',
-                        color: 'var(--color-text)',
-                        border: '1px solid var(--color-border)',
-                      }}
-                    />
-                    <input
-                      type="time"
-                      value={event.time}
-                      onChange={(e) => updateEvent(event.id, { time: e.target.value })}
-                      className="rounded px-3 py-2 text-sm"
-                      style={{
-                        backgroundColor: 'var(--color-surface)',
-                        color: 'var(--color-text)',
-                        border: '1px solid var(--color-border)',
-                      }}
-                    />
-                  </div>
-                  <textarea
-                    value={event.body}
-                    onChange={(e) => updateEvent(event.id, { body: e.target.value })}
-                    className="min-h-24 w-full rounded px-3 py-2 text-sm"
-                    style={{
-                      backgroundColor: 'var(--color-surface)',
-                      color: 'var(--color-text)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  />
-                </div>
-              ))}
-              {selectedDateEvents.length === 0 && (
-                <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                  Nessun evento su {formatEventDateLabel(selectedDateKey)}.
-                </div>
-              )}
-            </div>
+          <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+            Click su un giorno del calendario per creare un nuovo evento in quella data. L'editor completo è nel content type `Lista eventi`.
           </div>
         )}
         <p
@@ -857,8 +741,8 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
   );
 }
 
-function EventsListSection({ title, description, pageId, sectionIndex }: any) {
-  const { canEdit, site } = useAdmin();
+function EventsListSection({ title, description, indexTitle = 'Indice date', pageId, sectionIndex }: any) {
+  const { canEdit, site, updateSite } = useAdmin();
   const events = getSiteEventsSorted(site?.events || []);
   const eventsByDate = groupEventsByDate(events);
   const orderedDates = Object.keys(eventsByDate).sort();
@@ -877,6 +761,33 @@ function EventsListSection({ title, description, pageId, sectionIndex }: any) {
   }, [orderedDates, selectedDateKey, eventsByDate]);
 
   const selectedEvents = selectedDateKey ? eventsByDate[selectedDateKey] || [] : [];
+
+  const patchEvents = (nextEvents: SiteEvent[]) => {
+    updateSite({
+      ...site,
+      events: nextEvents.sort(compareEvents),
+    });
+  };
+
+  const updateEvent = (eventId: string, patch: Partial<SiteEvent>) => {
+    patchEvents(
+      events.map((event) => {
+        if (event.id !== eventId) {
+          return event;
+        }
+        return {
+          ...event,
+          ...patch,
+          date: normalizeEventDate(patch.date ?? event.date) || event.date,
+          time: normalizeEventTime(patch.time ?? event.time),
+        };
+      }),
+    );
+  };
+
+  const deleteEvent = (eventId: string) => {
+    patchEvents(events.filter((event) => event.id !== eventId));
+  };
 
   return (
     <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)] items-start">
@@ -915,7 +826,56 @@ function EventsListSection({ title, description, pageId, sectionIndex }: any) {
           }}
         >
           <div className="mb-3 text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-            Indice date
+            <InlineEditor
+              value={indexTitle}
+              path={['pages', pageId, 'sections', sectionIndex, 'indexTitle']}
+            />
+          </div>
+          <div
+            className="mb-4 rounded-lg p-2"
+            style={{
+              backgroundColor: 'var(--color-background)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <Calendar
+              showOutsideDays
+              month={selectedDateKey ? parseISO(selectedDateKey) : undefined}
+              selected={selectedDateKey ? parseISO(selectedDateKey) : undefined}
+              onDayClick={(day) => setSelectedDateKey(format(day, 'yyyy-MM-dd'))}
+              classNames={{
+                month: 'flex w-full flex-col gap-2',
+                caption_label: 'text-xs font-semibold',
+                head_cell: 'text-muted-foreground rounded-md flex-1 font-normal text-[0.65rem]',
+                row: 'flex w-full mt-1',
+                day: 'h-9 w-full rounded-md p-0 text-xs font-normal aria-selected:opacity-100',
+                day_today: 'bg-accent text-accent-foreground rounded-md',
+                day_selected: 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground rounded-md',
+              }}
+              components={{
+                DayContent: ({ date }: any) => {
+                  const dateKey = format(date, 'yyyy-MM-dd');
+                  const count = eventsByDate[dateKey]?.length || 0;
+                  return (
+                    <div className="relative flex h-full w-full flex-col items-center justify-center">
+                      <span>{format(date, 'd')}</span>
+                      {count > 0 && (
+                        <span
+                          className="absolute bottom-0.5 right-0.5 inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[9px] leading-none"
+                          style={{
+                            backgroundColor: 'var(--color-primary)',
+                            color: '#ffffff',
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </div>
+                  );
+                },
+              }}
+              className="mx-auto max-w-[240px]"
+            />
           </div>
           <div className="space-y-2">
             {orderedDates.map((dateKey) => (
@@ -962,20 +922,83 @@ function EventsListSection({ title, description, pageId, sectionIndex }: any) {
               }}
             >
               <div className="mb-2 flex items-center justify-between gap-3">
-                <h3
-                  className="text-xl font-bold"
-                  style={{
-                    color: 'var(--color-text)',
-                    fontFamily: 'var(--font-h3)',
-                    fontSize: 'var(--size-h3)',
-                  }}
-                >
-                  {event.title}
-                </h3>
-                <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                  {event.time}
-                </span>
+                {canEdit ? (
+                  <>
+                    <input
+                      type="text"
+                      value={event.title}
+                      onChange={(e) => updateEvent(event.id, { title: e.target.value })}
+                      className="w-full rounded px-3 py-2 text-sm"
+                      style={{
+                        backgroundColor: 'var(--color-surface)',
+                        color: 'var(--color-text)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => deleteEvent(event.id)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded"
+                      style={{
+                        backgroundColor: 'var(--color-background)',
+                        color: 'var(--color-text)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                      title="Elimina evento"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h3
+                      className="text-xl font-bold"
+                      style={{
+                        color: 'var(--color-text)',
+                        fontFamily: 'var(--font-h3)',
+                        fontSize: 'var(--size-h3)',
+                      }}
+                    >
+                      {event.title}
+                    </h3>
+                    <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                      {event.time}
+                    </span>
+                  </>
+                )}
               </div>
+              {canEdit && (
+                <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                  <input
+                    type="date"
+                    value={event.date}
+                    onChange={(e) => {
+                      const nextDate = normalizeEventDate(e.target.value);
+                      if (nextDate) {
+                        updateEvent(event.id, { date: nextDate });
+                        setSelectedDateKey(nextDate);
+                      }
+                    }}
+                    className="rounded px-3 py-2 text-sm"
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  />
+                  <input
+                    type="time"
+                    value={event.time}
+                    onChange={(e) => updateEvent(event.id, { time: e.target.value })}
+                    className="rounded px-3 py-2 text-sm"
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  />
+                </div>
+              )}
               <div
                 style={{
                   color: 'var(--color-text-secondary)',
@@ -984,7 +1007,20 @@ function EventsListSection({ title, description, pageId, sectionIndex }: any) {
                   whiteSpace: 'pre-wrap',
                 }}
               >
-                {renderMarkdownText(event.body)}
+                {canEdit ? (
+                  <textarea
+                    value={event.body}
+                    onChange={(e) => updateEvent(event.id, { body: e.target.value })}
+                    className="min-h-28 w-full rounded px-3 py-2 text-sm"
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  />
+                ) : (
+                  renderMarkdownText(event.body)
+                )}
               </div>
             </article>
           ))}

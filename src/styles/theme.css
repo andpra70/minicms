@@ -65,6 +65,7 @@
   --size-body-copy: 1.125rem;
   --container-width: 1280px;
   --section-spacing: 80px;
+  --content-type-spacing: 48px;
   --border-radius: 8px;
 }
 
@@ -332,6 +333,15 @@
 :root[data-cms-density='compact'] .space-y-16 > :not([hidden]) ~ :not([hidden]),
 :root[data-cms-density='ultra-compact'] .space-y-16 > :not([hidden]) ~ :not([hidden]) {
   margin-top: calc(4rem * var(--cms-density-scale)) !important;
+}
+
+.cms-section-stack > :not([hidden]) ~ :not([hidden]) {
+  margin-top: var(--content-type-spacing);
+}
+
+:root[data-cms-density='compact'] .cms-section-stack > :not([hidden]) ~ :not([hidden]),
+:root[data-cms-density='ultra-compact'] .cms-section-stack > :not([hidden]) ~ :not([hidden]) {
+  margin-top: calc(var(--content-type-spacing) * var(--cms-density-scale)) !important;
 }
 
 :root[data-cms-density='compact'] .space-y-8 > :not([hidden]) ~ :not([hidden]),

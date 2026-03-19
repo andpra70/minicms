@@ -7,6 +7,8 @@ import { PageLayout } from './components/PageLayout';
 import { AdminPanel } from './components/AdminPanel';
 import { ProjectPicker } from './components/ProjectPicker';
 import { getProjectNameFromUrl } from '@/app/lib/project-route';
+import { Toaster } from 'sonner';
+import 'sonner/dist/styles.css';
 
 export default function App() {
   const projectName = getProjectNameFromUrl();
@@ -35,6 +37,16 @@ export default function App() {
             </Routes>
             <Footer />
             <AdminPanel />
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                style: {
+                  background: 'var(--color-surface)',
+                  color: 'var(--color-text)',
+                  border: '1px solid var(--color-border)',
+                },
+              }}
+            />
           </div>
         </HashRouter>
       </ThemeProvider>

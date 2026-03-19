@@ -76,6 +76,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.style.setProperty('--size-body-copy', typography.bodySize);
     root.style.setProperty('--container-width', theme.spacing.container);
     root.style.setProperty('--section-spacing', theme.spacing.section);
+    root.style.setProperty('--content-type-spacing', theme.spacing.contentType || '48px');
     root.dataset.cmsDensity = theme.spacing.density || 'normal';
     root.style.setProperty('--border-radius', theme.borderRadius);
     root.style.setProperty('--logo-url', `url(${theme.logo})`);

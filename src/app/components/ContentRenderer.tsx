@@ -103,7 +103,7 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
   };
 
   return (
-    <div className="space-y-16">
+    <div className="cms-section-stack">
       {sections.map((section, index) => (
         <div
           key={index}
@@ -249,6 +249,7 @@ function createSectionTemplate(type: string) {
         title: 'Nuovo titolo hero',
         subtitle: 'Nuovo sottotitolo',
         image: defaultImage,
+        imageHeight: 256,
         imagePosX: 50,
         imagePosY: 50,
         imageScale: 100,
@@ -311,6 +312,7 @@ function createSectionTemplate(type: string) {
         title: 'Nuova sezione',
         content: 'Nuovo contenuto della sezione.',
         image: defaultImage,
+        imageHeight: 256,
         imagePosX: 50,
         imagePosY: 50,
         imageScale: 100,
@@ -328,6 +330,7 @@ function createItemTemplate(sectionType: string) {
       title: 'Nuova card',
       description: 'Descrizione della card',
       image: defaultImage,
+      imageHeight: 192,
       imagePosX: 50,
       imagePosY: 50,
       imageScale: 100,
@@ -355,6 +358,7 @@ function createItemTemplate(sectionType: string) {
       date: new Date().toISOString().slice(0, 10),
       author: 'Autore',
       image: defaultImage,
+      imageHeight: 192,
       imagePosX: 50,
       imagePosY: 50,
       imageScale: 100,
@@ -825,7 +829,11 @@ function PlaceSection({
   );
 }
 
-function HeroSection({ title, subtitle, image, imagePosX = 50, imagePosY = 50, imageScale = 100, cta, pageId, sectionIndex }: any) {
+function HeroSection({ title, subtitle, image, imageHeight = 256, imagePosX = 50, imagePosY = 50, imageScale = 100, cta, pageId, sectionIndex }: any) {
+  const { canEdit } = useAdmin();
+  const ctaText = cta?.text || 'Scopri di più';
+  const ctaLink = cta?.link || '/';
+
   return (
     <div className="text-center py-20">
       {image && (
@@ -834,13 +842,15 @@ function HeroSection({ title, subtitle, image, imagePosX = 50, imagePosY = 50, i
             src={image}
             alt={title}
             path={['pages', pageId, 'sections', sectionIndex, 'image']}
+            frameHeightPath={['pages', pageId, 'sections', sectionIndex, 'imageHeight']}
             posXPath={['pages', pageId, 'sections', sectionIndex, 'imagePosX']}
             posYPath={['pages', pageId, 'sections', sectionIndex, 'imagePosY']}
             scalePath={['pages', pageId, 'sections', sectionIndex, 'imageScale']}
+            frameHeight={imageHeight}
             posX={imagePosX}
             posY={imagePosY}
             scale={imageScale}
-            className="w-full h-64 object-cover rounded-lg"
+            className="w-full object-cover rounded-lg"
             style={{ borderRadius: 'var(--border-radius)' }}
           />
         </div>
@@ -873,18 +883,45 @@ function HeroSection({ title, subtitle, image, imagePosX = 50, imagePosY = 50, i
         />
       </p>
       {cta && (
-        <Link
-          to={cta.link}
-          className="inline-flex items-center gap-2 px-8 py-4 rounded-lg font-semibold transition-transform hover:scale-105"
-          style={{
-            backgroundColor: 'var(--color-primary)',
-            color: '#ffffff',
-            borderRadius: 'var(--border-radius)'
-          }}
-        >
-          {cta.text}
-          <ArrowRight className="w-5 h-5" />
-        </Link>
+        <div className="flex flex-col items-center gap-3">
+          <Link
+            to={ctaLink}
+            onClick={(e) => {
+              if (canEdit) {
+                e.preventDefault();
+              }
+            }}
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-lg font-semibold transition-transform hover:scale-105"
+            style={{
+              backgroundColor: 'var(--color-primary)',
+              color: '#ffffff',
+              borderRadius: 'var(--border-radius)'
+            }}
+          >
+            <InlineEditor
+              value={ctaText}
+              path={['pages', pageId, 'sections', sectionIndex, 'cta', 'text']}
+            />
+            <ArrowRight className="w-5 h-5" />
+          </Link>
+          {canEdit && (
+            <div className="w-full max-w-md">
+              <div className="mb-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                Slug destinazione CTA
+              </div>
+              <InlineEditor
+                value={ctaLink}
+                path={['pages', pageId, 'sections', sectionIndex, 'cta', 'link']}
+                className="block w-full rounded px-3 py-2 text-sm"
+                style={{
+                  backgroundColor: 'var(--color-background)',
+                  color: 'var(--color-text)',
+                  border: '1px solid var(--color-border)',
+                }}
+              />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -963,13 +1000,15 @@ function FeaturesSection({ title, items, pageId, sectionIndex }: any) {
                   src={item.image}
                   alt={item.title}
                   path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'image']}
+                  frameHeightPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageHeight']}
                   posXPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosX']}
                   posYPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosY']}
                   scalePath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageScale']}
+                  frameHeight={item.imageHeight ?? 192}
                   posX={item.imagePosX}
                   posY={item.imagePosY}
                   scale={item.imageScale ?? 100}
-                  className="w-full h-48 object-cover"
+                  className="w-full object-cover"
                 />
               </div>
             )}
@@ -1025,6 +1064,7 @@ function ContentSection({
   title,
   content,
   image,
+  imageHeight = 256,
   imagePosX = 50,
   imagePosY = 50,
   imageScale = 100,
@@ -1160,13 +1200,15 @@ function ContentSection({
         src={image}
         alt={title}
         path={['pages', pageId, 'sections', sectionIndex, 'image']}
+        frameHeightPath={['pages', pageId, 'sections', sectionIndex, 'imageHeight']}
         posXPath={['pages', pageId, 'sections', sectionIndex, 'imagePosX']}
         posYPath={['pages', pageId, 'sections', sectionIndex, 'imagePosY']}
         scalePath={['pages', pageId, 'sections', sectionIndex, 'imageScale']}
+        frameHeight={imageHeight}
         posX={imagePosX}
         posY={imagePosY}
         scale={imageScale}
-        className="w-full h-64 object-cover rounded-lg"
+        className="w-full object-cover rounded-lg"
         style={{ borderRadius: 'var(--border-radius)' }}
       />
     </div>
@@ -1197,8 +1239,6 @@ function ContentSection({
 function ServicesListSection({ items, pageId, sectionIndex }: any) {
   const { canEdit, content, updateContent } = useAdmin();
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
-  const MIN_IMAGE_HEIGHT = 50;
-  const MAX_IMAGE_HEIGHT = 500;
 
   const handleAddCard = () => {
     const newContent = JSON.parse(JSON.stringify(content));
@@ -1254,24 +1294,6 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
     }
     const parsed = Number(raw);
     return Number.isNaN(parsed) ? draggedItemIndex : parsed;
-  };
-
-  const getImageHeight = (raw: any) => {
-    const value = Number(raw);
-    if (Number.isNaN(value)) {
-      return 192;
-    }
-    return Math.max(MIN_IMAGE_HEIGHT, Math.min(MAX_IMAGE_HEIGHT, value));
-  };
-
-  const updateImageHeight = (itemIndex: number, value: number) => {
-    const newContent = JSON.parse(JSON.stringify(content));
-    const targetItem = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.items?.[itemIndex];
-    if (!targetItem) {
-      return;
-    }
-    targetItem.imageHeight = getImageHeight(value);
-    updateContent(newContent);
   };
 
   return (
@@ -1337,52 +1359,16 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
                 src={item.image}
                 alt={item.title}
                 path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'image']}
+                frameHeightPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageHeight']}
                 posXPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosX']}
                 posYPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosY']}
                 scalePath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageScale']}
+                frameHeight={item.imageHeight ?? 192}
                 posX={item.imagePosX}
                 posY={item.imagePosY}
                 scale={item.imageScale ?? 100}
                 className="w-full object-cover"
-                style={{ height: `${getImageHeight(item.imageHeight)}px` }}
               />
-            </div>
-          )}
-          {canEdit && (
-            <div
-              className="px-8 pt-4 pb-0"
-              style={{ borderTop: item.image ? '1px solid var(--color-border)' : 'none' }}
-            >
-              <div className="flex items-center gap-3">
-                <label
-                  className="text-sm whitespace-nowrap"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                >
-                  Altezza immagine
-                </label>
-                <input
-                  type="range"
-                  min={MIN_IMAGE_HEIGHT}
-                  max={MAX_IMAGE_HEIGHT}
-                  value={getImageHeight(item.imageHeight)}
-                  onChange={(e) => updateImageHeight(index, Number(e.target.value))}
-                  className="flex-1"
-                />
-                <input
-                  type="number"
-                  min={MIN_IMAGE_HEIGHT}
-                  max={MAX_IMAGE_HEIGHT}
-                  value={getImageHeight(item.imageHeight)}
-                  onChange={(e) => updateImageHeight(index, Number(e.target.value))}
-                  className="w-20 px-2 py-1 rounded text-sm"
-                  style={{
-                    backgroundColor: 'var(--color-background)',
-                    color: 'var(--color-text)',
-                    border: '1px solid var(--color-border)',
-                  }}
-                />
-                <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>px</span>
-              </div>
             </div>
           )}
           <div className="p-8">
@@ -1572,13 +1558,15 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
                   src={item.image}
                   alt={item.title}
                   path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'image']}
+                  frameHeightPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageHeight']}
                   posXPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosX']}
                   posYPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosY']}
                   scalePath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageScale']}
+                  frameHeight={item.imageHeight ?? 192}
                   posX={item.imagePosX}
                   posY={item.imagePosY}
                   scale={item.imageScale ?? 100}
-                  className="w-full h-48 object-cover"
+                  className="w-full object-cover"
                 />
               </div>
             )}

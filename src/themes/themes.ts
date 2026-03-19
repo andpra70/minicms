@@ -26,6 +26,7 @@ export interface Theme {
   spacing: {
     container: string;
     section: string;
+    contentType?: string;
     density?: 'normal' | 'compact' | 'ultra-compact';
   };
   borderRadius: string;
@@ -55,6 +56,7 @@ export const themes: Theme[] = [
     spacing: {
       container: '1280px',
       section: '80px',
+      contentType: '48px',
       density: 'normal',
     },
     borderRadius: '8px',
@@ -82,6 +84,7 @@ export const themes: Theme[] = [
     spacing: {
       container: '1280px',
       section: '80px',
+      contentType: '48px',
       density: 'normal',
     },
     borderRadius: '8px',
@@ -109,6 +112,7 @@ export const themes: Theme[] = [
     spacing: {
       container: '1200px',
       section: '100px',
+      contentType: '56px',
       density: 'normal',
     },
     borderRadius: '12px',
@@ -136,6 +140,7 @@ export const themes: Theme[] = [
     spacing: {
       container: '1100px',
       section: '120px',
+      contentType: '40px',
       density: 'normal',
     },
     borderRadius: '0px',
@@ -163,6 +168,7 @@ export const themes: Theme[] = [
     spacing: {
       container: '1280px',
       section: '90px',
+      contentType: '52px',
       density: 'normal',
     },
     borderRadius: '16px',

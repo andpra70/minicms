@@ -701,9 +701,13 @@ interface InlineImagePositionEditorProps {
   posXPath: string[];
   posYPath: string[];
   scalePath?: string[];
+  frameHeightPath?: string[];
   posX?: number;
   posY?: number;
   scale?: number;
+  frameHeight?: number;
+  minFrameHeight?: number;
+  maxFrameHeight?: number;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -715,33 +719,38 @@ export function InlineImagePositionEditor({
   posXPath, 
   posYPath, 
   scalePath,
+  frameHeightPath,
   posX = 50, 
   posY = 50, 
   scale = 100,
+  frameHeight,
+  minFrameHeight = 96,
+  maxFrameHeight = 720,
   className = '', 
   style 
 }: InlineImagePositionEditorProps) {
   const { canEdit, content, updateContent } = useAdmin();
-  const [isEditing, setIsEditing] = useState(false);
-  const [imageValue, setImageValue] = useState(src);
   const [localPosX, setLocalPosX] = useState(posX);
   const [localPosY, setLocalPosY] = useState(posY);
   const clampScale = (value: number) => Math.max(10, Math.min(200, value));
-  const [localScale, setLocalScale] = useState(clampScale(scale));
-  const [isDragging, setIsDragging] = useState(false);
+  const clampFrameHeight = (value: number) => Math.max(minFrameHeight, Math.min(maxFrameHeight, value));
+  const [localScale] = useState(clampScale(scale));
+  const [localFrameHeight, setLocalFrameHeight] = useState(
+    typeof frameHeight === 'number' ? clampFrameHeight(frameHeight) : undefined
+  );
   const [isDropOver, setIsDropOver] = useState(false);
   const [isDirectPanning, setIsDirectPanning] = useState(false);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const [isResizingFrame, setIsResizingFrame] = useState(false);
   const imageFrameRef = useRef<HTMLDivElement>(null);
+  const resizeStartRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
   useEffect(() => {
-    if (!isDirectPanning && !isEditing) {
-      setImageValue(src);
+    if (!isDirectPanning && !isResizingFrame) {
       setLocalPosX(posX);
       setLocalPosY(posY);
-      setLocalScale(clampScale(scale));
+      setLocalFrameHeight(typeof frameHeight === 'number' ? clampFrameHeight(frameHeight) : undefined);
     }
-  }, [src, posX, posY, scale, isDirectPanning, isEditing]);
+  }, [posX, posY, scale, frameHeight, isDirectPanning, isResizingFrame]);
 
   const persistDirectPan = (nextPosX: number, nextPosY: number) => {
     const newContent = JSON.parse(JSON.stringify(content));
@@ -758,6 +767,20 @@ export function InlineImagePositionEditor({
     }
     current[posYPath[posYPath.length - 1]] = Math.round(nextPosY);
 
+    updateContent(newContent);
+  };
+
+  const persistFrameHeight = (nextHeight: number) => {
+    if (!Array.isArray(frameHeightPath) || frameHeightPath.length === 0) {
+      return;
+    }
+
+    const newContent = JSON.parse(JSON.stringify(content));
+    let current = newContent;
+    for (let i = 0; i < frameHeightPath.length - 1; i++) {
+      current = current[frameHeightPath[i]];
+    }
+    current[frameHeightPath[frameHeightPath.length - 1]] = clampFrameHeight(Math.round(nextHeight));
     updateContent(newContent);
   };
 
@@ -796,100 +819,6 @@ export function InlineImagePositionEditor({
     };
   }, [isDirectPanning, localPosX, localPosY, content, posXPath, posYPath]);
 
-  const handleSave = () => {
-    const newContent = JSON.parse(JSON.stringify(content));
-    
-    // Update image URL
-    let current = newContent;
-    for (let i = 0; i < path.length - 1; i++) {
-      current = current[path[i]];
-    }
-    current[path[path.length - 1]] = ensureImageReference(imageValue, newContent);
-    
-    // Update position X
-    current = newContent;
-    for (let i = 0; i < posXPath.length - 1; i++) {
-      current = current[posXPath[i]];
-    }
-    current[posXPath[posXPath.length - 1]] = Math.round(localPosX);
-    
-    // Update position Y
-    current = newContent;
-    for (let i = 0; i < posYPath.length - 1; i++) {
-      current = current[posYPath[i]];
-    }
-    current[posYPath[posYPath.length - 1]] = Math.round(localPosY);
-
-    if (Array.isArray(scalePath) && scalePath.length > 0) {
-      current = newContent;
-      for (let i = 0; i < scalePath.length - 1; i++) {
-        current = current[scalePath[i]];
-      }
-      current[scalePath[scalePath.length - 1]] = clampScale(Math.round(localScale));
-    }
-    
-    updateContent(newContent);
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setImageValue(src);
-    setLocalPosX(posX);
-    setLocalPosY(posY);
-    setLocalScale(clampScale(scale));
-    setIsEditing(false);
-  };
-
-  const handlePasteFromClipboard = async () => {
-    try {
-      if (!navigator.clipboard || !navigator.clipboard.read) {
-        alert('Clipboard API non disponibile nel browser.');
-        return;
-      }
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        const imageType = item.types.find((type) => type.startsWith('image/'));
-        if (imageType) {
-          const blob = await item.getType(imageType);
-          const file = new File([blob], 'clipboard-image', { type: imageType });
-          const dataUrl = await optimizeImageFile(file);
-          setImageValue(dataUrl);
-          return;
-        }
-      }
-      alert('Nessuna immagine trovata negli appunti.');
-    } catch (error) {
-      console.error(error);
-      alert('Impossibile leggere la clipboard.');
-    }
-  };
-
-  const handleMouseDown = () => {
-    setIsDragging(true);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging || !previewRef.current) return;
-
-    const rect = previewRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    // Calcola percentuale
-    const percentX = Math.max(0, Math.min(100, (x / rect.width) * 100));
-    const percentY = Math.max(0, Math.min(100, (y / rect.height) * 100));
-
-    setLocalPosX(Math.round(percentX));
-    setLocalPosY(Math.round(percentY));
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const resolvedCurrentSrc = resolveImageSource(isEditing ? imageValue : src, content);
-  const resolvedPreviewSrc = resolveImageSource(imageValue, content);
-
   const handleDirectDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setIsDropOver(false);
@@ -898,30 +827,71 @@ export function InlineImagePositionEditor({
       return;
     }
     try {
-      const nextValue = await applyOptimizedImageToPath(file, content, path, updateContent);
-      setImageValue(nextValue);
-      setIsEditing(false);
+      await applyOptimizedImageToPath(file, content, path, updateContent);
     } catch (error) {
       console.error(error);
       alert(error instanceof Error ? error.message : 'Impossibile sostituire l\'immagine.');
     }
   };
 
+  useEffect(() => {
+    if (!isResizingFrame) {
+      return;
+    }
+
+    const handlePointerMove = (event: MouseEvent) => {
+      const start = resizeStartRef.current;
+      if (!start) {
+        return;
+      }
+      setLocalFrameHeight(clampFrameHeight(start.startHeight + (event.clientY - start.startY)));
+    };
+
+    const handlePointerUp = () => {
+      resizeStartRef.current = null;
+      setIsResizingFrame(false);
+      if (typeof localFrameHeight === 'number') {
+        persistFrameHeight(localFrameHeight);
+      }
+    };
+
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp, { once: true });
+
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+    };
+  }, [isResizingFrame, localFrameHeight, content, frameHeightPath]);
+
   if (!canEdit) {
     return (
-      <img 
-        src={resolveImageSource(src, content)} 
-        alt={alt} 
-        className={className} 
+      <div
         style={{
-          ...style,
-          objectPosition: `${posX}% ${posY}%`,
-          transform: `scale(${clampScale(scale) / 100})`,
-          transformOrigin: `${posX}% ${posY}%`,
-        }} 
-      />
+          ...(style || {}),
+          height: typeof frameHeight === 'number' ? `${clampFrameHeight(frameHeight)}px` : style?.height,
+          overflow: 'hidden',
+        }}
+      >
+        <img 
+          src={resolveImageSource(src, content)} 
+          alt={alt} 
+          className={className} 
+          style={{
+            width: '100%',
+            height: '100%',
+            objectPosition: `${posX}% ${posY}%`,
+            transform: `scale(${clampScale(scale) / 100})`,
+            transformOrigin: `${posX}% ${posY}%`,
+          }} 
+        />
+      </div>
     );
   }
+
+  const { height: _, ...frameStyle } = style || {};
+  const effectiveFrameHeight = typeof localFrameHeight === 'number' ? localFrameHeight : undefined;
+  const resolvedCurrentSrc = resolveImageSource(src, content);
 
   return (
     <div
@@ -937,46 +907,94 @@ export function InlineImagePositionEditor({
         ref={imageFrameRef}
         className="relative"
         onMouseDown={(event) => {
-          if (!canEdit || isEditing || event.button !== 0) {
+          if (!canEdit || event.button !== 0) {
             return;
           }
           const target = event.target as HTMLElement | null;
-          if (target?.closest('button')) {
+          if (target?.dataset.resizeHandle === 'true') {
             return;
           }
           event.preventDefault();
           updatePanFromPointer(event.clientX, event.clientY);
           setIsDirectPanning(true);
         }}
-        style={{ cursor: canEdit && !isEditing ? (isDirectPanning ? 'grabbing' : 'grab') : undefined }}
+        style={{
+          ...frameStyle,
+          height: typeof effectiveFrameHeight === 'number' ? `${effectiveFrameHeight}px` : undefined,
+          overflow: 'hidden',
+          outline: '1px dashed color-mix(in srgb, var(--color-primary) 70%, transparent)',
+          outlineOffset: '-1px',
+          cursor: isDirectPanning ? 'grabbing' : 'grab',
+        }}
       >
         <img 
           src={resolvedCurrentSrc} 
           alt={alt} 
           className={className} 
           style={{
-            ...style,
-            objectPosition: `${isEditing || isDirectPanning ? localPosX : posX}% ${isEditing || isDirectPanning ? localPosY : posY}%`,
-            transform: `scale(${(isEditing ? localScale : clampScale(scale)) / 100})`,
-            transformOrigin: `${isEditing || isDirectPanning ? localPosX : posX}% ${isEditing || isDirectPanning ? localPosY : posY}%`,
+            width: '100%',
+            height: '100%',
+            objectPosition: `${isDirectPanning ? localPosX : posX}% ${isDirectPanning ? localPosY : posY}%`,
+            transform: `scale(${clampScale(localScale) / 100})`,
+            transformOrigin: `${isDirectPanning ? localPosX : posX}% ${isDirectPanning ? localPosY : posY}%`,
             userSelect: 'none',
           }} 
           draggable={false}
         />
-        {canEdit && !isEditing && (
+        {typeof effectiveFrameHeight === 'number' && (
+          <>
+            <div
+              data-resize-handle="true"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                resizeStartRef.current = {
+                  startY: event.clientY,
+                  startHeight: effectiveFrameHeight,
+                };
+                setIsResizingFrame(true);
+              }}
+              className="absolute left-0 right-0 bottom-0 h-3 cursor-ns-resize"
+              style={{ zIndex: 14 }}
+              title="Ridimensiona altezza"
+            />
+            <div
+              data-resize-handle="true"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                resizeStartRef.current = {
+                  startY: event.clientY,
+                  startHeight: effectiveFrameHeight,
+                };
+                setIsResizingFrame(true);
+              }}
+              className="absolute bottom-1 right-1 h-4 w-4 cursor-nwse-resize rounded-sm"
+              style={{
+                zIndex: 15,
+                backgroundColor: 'var(--color-primary)',
+                border: '1px solid var(--color-background)',
+              }}
+              title="Ridimensiona contenitore"
+            />
+          </>
+        )}
+        <div
+          className="absolute inset-x-0 bottom-3 px-3 text-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+          style={{ zIndex: 12 }}
+        >
           <div
-            className="absolute left-3 bottom-3 px-2 py-1 rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+            className="inline-flex px-2 py-1 rounded text-[10px]"
             style={{
               backgroundColor: 'rgba(0,0,0,0.6)',
               color: '#ffffff',
-              zIndex: 12,
             }}
           >
-            Trascina per crop
+            Trascina per crop, bordo inferiore per resize, drop per sostituire
           </div>
-        )}
+        </div>
       </div>
-      {isDropOver && !isEditing && (
+      {isDropOver && (
         <div
           className="absolute inset-0 flex items-center justify-center rounded"
           style={{
@@ -987,296 +1005,6 @@ export function InlineImagePositionEditor({
           }}
         >
           Drop per sostituire
-        </div>
-      )}
-      
-      {!isEditing && (
-        <button
-          onClick={() => setIsEditing(true)}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-2 rounded opacity-0 group-hover:opacity-100 transition-opacity z-20"
-          style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
-          title="Modifica immagine e posizionamento"
-        >
-          <Edit2 className="w-4 h-4" />
-        </button>
-      )}
-
-      {isEditing && (
-        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 9999 }}>
-          <div className="w-full max-w-2xl space-y-4 max-h-screen overflow-y-auto">
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)' }}>
-                URL Immagine
-              </label>
-              <input
-                type="text"
-                value={getDisplayValue(imageValue)}
-                onChange={(e) => setImageValue(e.target.value)}
-                placeholder="URL immagine..."
-                className="w-full px-3 py-2 rounded"
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  color: 'var(--color-text)',
-                  border: '1px solid var(--color-border)',
-                }}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handlePasteFromClipboard}
-              className="w-full px-3 py-2 rounded text-sm"
-              style={{
-                backgroundColor: 'var(--color-background)',
-                color: 'var(--color-text)',
-                border: '1px solid var(--color-border)',
-              }}
-            >
-              Incolla da clipboard
-            </button>
-            <EmbeddedGalleryDropzone onSelectRef={setImageValue} />
-            <div className="space-y-2">
-              <label className="block text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-                Gallery locale (/public/img)
-              </label>
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                {LOCAL_IMAGE_GALLERY.map((imagePath) => (
-                  <button
-                    key={imagePath}
-                    type="button"
-                    onClick={() => setImageValue(imagePath)}
-                    className="h-16 rounded overflow-hidden"
-                    style={{
-                      border: imageValue === imagePath ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                      backgroundColor: 'var(--color-background)',
-                    }}
-                    title={imagePath}
-                  >
-                    <img src={resolveAppAssetUrl(imagePath)} alt={imagePath} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            </div>
-            <EmbeddedGalleryGrid
-              content={content}
-              selectedValue={imageValue}
-              onSelectRef={setImageValue}
-              onDeleteRef={() => setImageValue('')}
-            />
-
-            {resolvedPreviewSrc && (
-              <div className="space-y-3">
-                <label className="block text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-                  Anteprima e Pan (trascinare per posizionare)
-                </label>
-                <div
-                  ref={previewRef}
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
-                  className="relative w-full h-64 rounded overflow-hidden cursor-move bg-black"
-                  style={{
-                    userSelect: isDragging ? 'none' : 'auto',
-                    border: '2px solid var(--color-primary)',
-                  }}
-                >
-                  <img
-                    src={resolvedPreviewSrc}
-                    alt={alt}
-                    className="w-full h-full object-cover"
-                    style={{
-                      objectPosition: `${localPosX}% ${localPosY}%`,
-                      transform: `scale(${localScale / 100})`,
-                      transformOrigin: `${localPosX}% ${localPosY}%`,
-                      cursor: isDragging ? 'grabbing' : 'grab',
-                    }}
-                    onError={() => {}}
-                  />
-                  {/* Crosshair al centro */}
-                  <div
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: `${localPosX}%`,
-                      top: `${localPosY}%`,
-                      transform: 'translate(-50%, -50%)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '20px',
-                        height: '20px',
-                        border: '2px solid rgba(255, 255, 255, 0.8)',
-                        borderRadius: '50%',
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: 'absolute',
-                        width: '12px',
-                        height: '2px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-3 p-3 rounded" style={{ backgroundColor: 'var(--color-surface)' }}>
-              <h4 style={{ color: 'var(--color-text)', fontSize: '0.875rem', fontWeight: 'bold' }}>
-                Posizionamento Immagine (Pan)
-              </h4>
-
-              <div className="space-y-2">
-                <label className="block text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                  Allineamento rapido
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setLocalPosY(0)}
-                    className="px-2 py-1 rounded text-xs"
-                    style={{
-                      backgroundColor: 'var(--color-background)',
-                      color: 'var(--color-text)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  >
-                    Top
-                  </button>
-                  <button
-                    onClick={() => setLocalPosY(100)}
-                    className="px-2 py-1 rounded text-xs"
-                    style={{
-                      backgroundColor: 'var(--color-background)',
-                      color: 'var(--color-text)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  >
-                    Bottom
-                  </button>
-                  <button
-                    onClick={() => setLocalPosX(0)}
-                    className="px-2 py-1 rounded text-xs"
-                    style={{
-                      backgroundColor: 'var(--color-background)',
-                      color: 'var(--color-text)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  >
-                    Left
-                  </button>
-                  <button
-                    onClick={() => setLocalPosX(100)}
-                    className="px-2 py-1 rounded text-xs"
-                    style={{
-                      backgroundColor: 'var(--color-background)',
-                      color: 'var(--color-text)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  >
-                    Right
-                  </button>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                  Orizzontale: {localPosX}%
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={localPosX}
-                  onChange={(e) => setLocalPosX(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                  Verticale: {localPosY}%
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={localPosY}
-                  onChange={(e) => setLocalPosY(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                  Scala: {Math.round(localScale)}%
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="10"
-                    max="200"
-                    value={localScale}
-                    onChange={(e) => setLocalScale(clampScale(Number(e.target.value)))}
-                    className="w-full"
-                  />
-                  <input
-                    type="number"
-                    min="10"
-                    max="200"
-                    value={Math.round(localScale)}
-                    onChange={(e) => setLocalScale(clampScale(Number(e.target.value)))}
-                    className="w-20 px-2 py-1 rounded text-sm"
-                    style={{
-                      backgroundColor: 'var(--color-background)',
-                      color: 'var(--color-text)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => { setLocalPosX(50); setLocalPosY(50); setLocalScale(100); }}
-                  className="flex-1 px-2 py-1 rounded text-xs"
-                  style={{
-                    backgroundColor: 'var(--color-background)',
-                    color: 'var(--color-text)',
-                    border: '1px solid var(--color-border)',
-                  }}
-                >
-                  Centra
-                </button>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleSave}
-                className="flex-1 px-4 py-2 rounded flex items-center justify-center gap-2"
-                style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}
-              >
-                <Check className="w-4 h-4" />
-                Salva
-              </button>
-              <button
-                onClick={handleCancel}
-                className="flex-1 px-4 py-2 rounded flex items-center justify-center gap-2"
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  color: 'var(--color-text)',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <X className="w-4 h-4" />
-                Annulla
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

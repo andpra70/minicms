@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Settings, X, Download, Upload, Paintbrush } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAdmin } from '@/contexts/AdminContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { themes } from '@/themes/themes';
@@ -53,6 +54,7 @@ const DEFAULT_TYPOGRAPHY = {
 const DEFAULT_SPACING = {
   container: '1280px',
   section: '80px',
+  contentType: '48px',
   density: 'normal' as 'normal' | 'compact' | 'ultra-compact',
 };
 
@@ -345,6 +347,7 @@ function generateStaticHTML(menuData: any, contentData: any, theme: any) {
         --size-body-copy: ${typography.bodySize};
         --container-width: ${theme.spacing?.container || '1200px'};
         --section-spacing: ${theme.spacing?.section || '80px'};
+        --content-type-spacing: ${theme.spacing?.contentType || '48px'};
         --header-background: url(${theme.headerBackground || ''});
         --footer-background: url(${theme.footerBackground || ''});
         --logo-url: url(${theme.logo || ''});
@@ -1209,6 +1212,7 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
       await saveTextToFileserver(fileName, JSON.stringify(cleanedSite, null, 2));
       setError('');
       closeMenu();
+      toast.success(`File salvato: ${fileName}`);
     } catch (error) {
       console.error('Errore salvataggio fileserver:', error);
       alert(`Salvataggio su fileserver fallito: ${error instanceof Error ? error.message : 'errore sconosciuto'}`);
@@ -1405,7 +1409,7 @@ function ThemeEditor() {
     });
   };
 
-  const handleSpacingChange = (key: 'container' | 'section' | 'density', value: string) => {
+  const handleSpacingChange = (key: 'container' | 'section' | 'contentType' | 'density', value: string) => {
     applyThemeUpdate({
       ...customTheme,
       spacing: {
@@ -1601,6 +1605,30 @@ function ThemeEditor() {
               border: '1px solid var(--color-border)',
             }}
             placeholder="es: 80px"
+          />
+        </div>
+
+        <div
+          className="p-3 rounded space-y-2"
+          style={{
+            backgroundColor: 'var(--color-background)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <label className="block text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+            Distanza tra content type
+          </label>
+          <input
+            type="text"
+            value={spacing.contentType}
+            onChange={(e) => handleSpacingChange('contentType', e.target.value)}
+            className="w-full px-2 py-1 text-sm rounded font-mono"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              color: 'var(--color-text)',
+              border: '1px solid var(--color-border)',
+            }}
+            placeholder="es: 48px"
           />
         </div>
 

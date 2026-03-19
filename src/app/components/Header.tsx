@@ -43,6 +43,16 @@ export function Header() {
     return allItems.some((item) => item.id === id || item.path === path);
   };
 
+  const hasRouteConflictExcept = (currentId: string, currentPath: string, nextId: string, nextPath: string) => {
+    const allItems = menuItems.flatMap((item) => [item, ...(item.children || [])]);
+    return allItems.some((item) => {
+      if (item.id === currentId && item.path === currentPath) {
+        return false;
+      }
+      return item.id === nextId || item.path === nextPath;
+    });
+  };
+
   const reorderById = (items: any[], fromId: string, toId: string, position: 'before' | 'after') => {
     const fromIndex = items.findIndex((item) => item.id === fromId);
     const toIndex = items.findIndex((item) => item.id === toId);
@@ -259,6 +269,7 @@ export function Header() {
 
   const handleEditRouteLabel = (itemToEdit: MenuItem, parentId?: string) => {
     if (!canEdit) return;
+
     const nextLabel = window.prompt('Nuova label pagina', itemToEdit.label);
     if (!nextLabel) return;
 
@@ -268,25 +279,76 @@ export function Header() {
       return;
     }
 
+    const currentSlug = itemToEdit.path.split('/').filter(Boolean).pop() || itemToEdit.id;
+    const slugPromptLabel = parentId ? 'Nuovo slug sotto pagina' : 'Nuovo slug pagina';
+    const nextSlugInput = window.prompt(`${slugPromptLabel} (es. ${currentSlug})`, currentSlug);
+    if (!nextSlugInput) return;
+
+    const nextSlug = toSlug(nextSlugInput);
+    if (!nextSlug || nextSlug === 'home') {
+      window.alert('Slug non valido.');
+      return;
+    }
+
+    const nextPath = parentId
+      ? `${((menuItems.find((item) => item.id === parentId)?.path) || '').replace(/\/$/, '')}/${nextSlug}`
+      : `/${nextSlug}`;
+
+    if (hasRouteConflictExcept(itemToEdit.id, itemToEdit.path, nextSlug, nextPath)) {
+      window.alert('Questa route esiste già.');
+      return;
+    }
+
     const newMenu = JSON.parse(JSON.stringify(menu));
+    let previousParentPath = '';
 
     if (parentId) {
       const parent = (newMenu.items || []).find((item: MenuItem) => item.id === parentId);
       const child = parent?.children?.find((childItem: MenuItem) => childItem.id === itemToEdit.id);
       if (!child) return;
       child.label = cleanedLabel;
+      child.id = nextSlug;
+      child.path = nextPath;
     } else {
       const item = (newMenu.items || []).find((menuItem: MenuItem) => menuItem.id === itemToEdit.id);
       if (!item) return;
+      previousParentPath = item.path;
       item.label = cleanedLabel;
+      item.id = nextSlug;
+      item.path = nextPath;
+      if (Array.isArray(item.children)) {
+        item.children = item.children.map((child: MenuItem) => {
+          const childSlug = child.path.split('/').filter(Boolean).pop() || child.id;
+          return {
+            ...child,
+            path: `${nextPath}/${childSlug}`,
+          };
+        });
+      }
     }
 
     updateMenu(newMenu);
 
     if (content?.pages?.[itemToEdit.id]) {
       const newContent = JSON.parse(JSON.stringify(content));
-      newContent.pages[itemToEdit.id].title = cleanedLabel;
+      newContent.pages[nextSlug] = {
+        ...newContent.pages[itemToEdit.id],
+        id: nextSlug,
+        title: cleanedLabel,
+      };
+      if (nextSlug !== itemToEdit.id) {
+        delete newContent.pages[itemToEdit.id];
+      }
       updateContent(newContent);
+    }
+
+    if (location.pathname === itemToEdit.path) {
+      navigate(nextPath);
+      return;
+    }
+
+    if (!parentId && previousParentPath && location.pathname.startsWith(`${previousParentPath}/`)) {
+      navigate(location.pathname.replace(previousParentPath, nextPath));
     }
   };
 
@@ -352,6 +414,8 @@ export function Header() {
                       border: '1px solid var(--color-border)',
                       fontFamily: 'var(--font-site-title)',
                       fontSize: 'var(--size-site-title)',
+                      fontWeight: 'inherit',
+                      lineHeight: 'inherit',
                     }}
                     autoFocus
                   />
@@ -387,7 +451,13 @@ export function Header() {
                   type="button"
                   onClick={handleStartTitleEdit}
                   className="inline-flex items-center gap-2 text-left"
-                  style={{ color: 'inherit' }}
+                  style={{
+                    color: 'inherit',
+                    fontFamily: 'inherit',
+                    fontSize: 'inherit',
+                    fontWeight: 'inherit',
+                    lineHeight: 'inherit',
+                  }}
                   title="Modifica titolo sito"
                 >
                   <span>{menu.logo || 'Mini CMS'}</span>

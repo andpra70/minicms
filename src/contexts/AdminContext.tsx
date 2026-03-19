@@ -26,6 +26,7 @@ type SiteData = {
   items: any[];
   pages: Record<string, any>;
   gallery: any[];
+  events: any[];
   theme?: any;
   footer?: {
     line1?: string;
@@ -38,6 +39,7 @@ const EMPTY_SITE: SiteData = {
   items: [],
   pages: {},
   gallery: [],
+  events: [],
 };
 
 function setLocalStorageSafely(key: string, value: string) {
@@ -72,6 +74,7 @@ function normalizeSite(input: any, fallback: SiteData = EMPTY_SITE): SiteData {
     items: Array.isArray(input?.items) ? input.items : fallback.items || [],
     pages: input?.pages || fallback.pages || {},
     gallery: Array.isArray(input?.gallery) ? input.gallery : fallback.gallery || [],
+    events: Array.isArray(input?.events) ? input.events : fallback.events || [],
     theme: input?.theme || fallback.theme,
     footer: input?.footer || fallback.footer,
   };

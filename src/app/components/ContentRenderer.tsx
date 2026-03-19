@@ -7,6 +7,7 @@ import { geocodeAddress, loadLeaflet } from '@/app/lib/leaflet';
 import { Calendar } from './ui/calendar';
 import { parseCalendarInput } from '@/app/lib/calendar-highlights';
 import { buildYouTubeEmbedUrl } from '@/app/lib/youtube';
+import { compareAsc, format, isValid, parseISO } from 'date-fns';
 
 interface Section {
   type: string;
@@ -16,6 +17,74 @@ interface Section {
 interface ContentRendererProps {
   sections: Section[];
   pageId: string;
+}
+
+type SiteEvent = {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  body: string;
+};
+
+function normalizeEventDate(value: string) {
+  const parsed = parseISO(String(value || '').trim());
+  if (!isValid(parsed)) {
+    return '';
+  }
+  return format(parsed, 'yyyy-MM-dd');
+}
+
+function normalizeEventTime(value: string) {
+  const trimmed = String(value || '').trim();
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) {
+    return '09:00';
+  }
+  const hours = Math.max(0, Math.min(23, Number(match[1])));
+  const minutes = Math.max(0, Math.min(59, Number(match[2])));
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function compareEvents(a: SiteEvent, b: SiteEvent) {
+  return compareAsc(parseISO(`${a.date}T${a.time}:00`), parseISO(`${b.date}T${b.time}:00`));
+}
+
+function getSiteEventsSorted(events: any[]): SiteEvent[] {
+  return (Array.isArray(events) ? events : [])
+    .map((event) => ({
+      id: String(event?.id || `event-${Date.now()}`),
+      title: String(event?.title || 'Nuovo evento'),
+      date: normalizeEventDate(event?.date || '') || format(new Date(), 'yyyy-MM-dd'),
+      time: normalizeEventTime(event?.time || '09:00'),
+      body: String(event?.body || ''),
+    }))
+    .sort(compareEvents);
+}
+
+function groupEventsByDate(events: SiteEvent[]) {
+  return events.reduce<Record<string, SiteEvent[]>>((acc, event) => {
+    if (!acc[event.date]) {
+      acc[event.date] = [];
+    }
+    acc[event.date].push(event);
+    return acc;
+  }, {});
+}
+
+function createSiteEvent(date: string): SiteEvent {
+  return {
+    id: `event-${Date.now()}`,
+    title: 'Nuovo evento',
+    date,
+    time: '09:00',
+    body: 'Corpo evento in markdown.',
+  };
+}
+
+function formatEventDateLabel(date: string) {
+  const parsed = parseISO(date);
+  return isValid(parsed) ? format(parsed, 'dd/MM/yyyy') : date;
 }
 
 function toAnchorSlug(value: string) {
@@ -203,7 +272,7 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
             Aggiungi una nuova sezione
           </p>
           <div className="flex flex-wrap gap-2">
-            {['hero', 'content', 'features', 'services-list', 'blog-list', 'contact-info', 'place', 'calendar', 'youtube'].map((type) => (
+            {['hero', 'content', 'features', 'services-list', 'blog-list', 'contact-info', 'place', 'calendar', 'events-list', 'youtube'].map((type) => (
               <button
                 key={type}
                 onClick={() => addSection(type)}
@@ -235,6 +304,7 @@ function getSectionLabel(type: string) {
     'contact-info': 'Contatti',
     place: 'Luogo',
     calendar: 'Calendario',
+    'events-list': 'Lista eventi',
     youtube: 'YouTube',
   };
   return labels[type] || type;
@@ -297,6 +367,12 @@ function createSectionTemplate(type: string) {
         description: 'Date importanti in evidenza.',
         entries: '2026-03-20\n2026-03-24..2026-03-27\n2026-04-02',
         notes: 'Le date evidenziate indicano aperture speciali ed eventi.',
+      };
+    case 'events-list':
+      return {
+        type: 'events-list',
+        title: 'Lista eventi',
+        description: 'Indice per data e dettaglio degli eventi del giorno selezionato.',
       };
     case 'youtube':
       return {
@@ -393,6 +469,8 @@ function SectionRenderer({ section, pageId, sectionIndex }: { section: Section; 
       return <PlaceSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
     case 'calendar':
       return <CalendarSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+    case 'events-list':
+      return <EventsListSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
     case 'youtube':
       return <YouTubeSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
     default:

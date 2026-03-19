@@ -19,6 +19,22 @@ interface ContentRendererProps {
   pageId: string;
 }
 
+const SECTION_TYPE_OPTIONS = [
+  'hero',
+  'content',
+  'features',
+  'services-list',
+  'blog-list',
+  'contact-info',
+  'place',
+  'calendar',
+  'events-list',
+  'layout-1col',
+  'layout-2col',
+  'layout-3col',
+  'youtube',
+] as const;
+
 type SiteEvent = {
   id: string;
   title: string;
@@ -170,18 +186,67 @@ function SlugSelectField({
   );
 }
 
-export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
+function getValueAtPath(target: any, path: Array<string | number>) {
+  return path.reduce<any>((current, key) => current?.[key], target);
+}
+
+function getSectionBasePath(pageId: string, sectionIndex: number, sectionPath?: Array<string | number>) {
+  return sectionPath || ['pages', pageId, 'sections', sectionIndex];
+}
+
+function SectionList({
+  sections,
+  listPath,
+  pageId,
+  nested = false,
+}: {
+  sections: Section[];
+  listPath: Array<string | number>;
+  pageId: string;
+  nested?: boolean;
+}) {
   const { canEdit, content, updateContent } = useAdmin();
   const [draggedSectionIndex, setDraggedSectionIndex] = useState<number | null>(null);
   const [dropIndicator, setDropIndicator] = useState<{ index: number; position: 'before' | 'after' } | null>(null);
 
-  const handleDragStart = (e: React.DragEvent<HTMLElement>, index: number) => {
-    if (!canEdit) {
+  const addSection = (sectionType: string) => {
+    const newContent = JSON.parse(JSON.stringify(content));
+    const targetSections = getValueAtPath(newContent, listPath);
+    if (!Array.isArray(targetSections)) {
       return;
     }
-    setDraggedSectionIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', String(index));
+    targetSections.push(createSectionTemplate(sectionType));
+    updateContent(newContent);
+  };
+
+  const removeSection = (sectionIndex: number) => {
+    const confirmed = window.confirm('Vuoi eliminare questa sezione?');
+    if (!confirmed) {
+      return;
+    }
+    const newContent = JSON.parse(JSON.stringify(content));
+    const targetSections = getValueAtPath(newContent, listPath);
+    if (!Array.isArray(targetSections)) {
+      return;
+    }
+    targetSections.splice(sectionIndex, 1);
+    updateContent(newContent);
+  };
+
+  const moveSection = (fromIndex: number, toIndex: number, position: 'before' | 'after') => {
+    if (fromIndex === toIndex && position === 'before') {
+      return;
+    }
+    const newContent = JSON.parse(JSON.stringify(content));
+    const targetSections = getValueAtPath(newContent, listPath);
+    if (!Array.isArray(targetSections)) {
+      return;
+    }
+    const [moved] = targetSections.splice(fromIndex, 1);
+    const targetIndex = position === 'after' ? toIndex + 1 : toIndex;
+    const adjustedIndex = fromIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    targetSections.splice(adjustedIndex, 0, moved);
+    updateContent(newContent);
   };
 
   const readDraggedIndex = (e: React.DragEvent<HTMLElement>) => {
@@ -193,135 +258,99 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
     return Number.isNaN(parsed) ? draggedSectionIndex : parsed;
   };
 
-  const addSection = (sectionType: string) => {
-    const newContent = JSON.parse(JSON.stringify(content));
-    const page = newContent.pages?.[pageId];
-    if (!page || !Array.isArray(page.sections)) {
-      return;
-    }
-
-    page.sections.push(createSectionTemplate(sectionType));
-    updateContent(newContent);
-  };
-
-  const removeSection = (sectionIndex: number) => {
-    const confirmed = window.confirm('Vuoi eliminare questa sezione?');
-    if (!confirmed) {
-      return;
-    }
-    const newContent = JSON.parse(JSON.stringify(content));
-    const page = newContent.pages?.[pageId];
-    if (!page || !Array.isArray(page.sections)) {
-      return;
-    }
-    page.sections.splice(sectionIndex, 1);
-    updateContent(newContent);
-  };
-
-  const moveSection = (fromIndex: number, toIndex: number, position: 'before' | 'after') => {
-    if (fromIndex === toIndex && position === 'before') {
-      return;
-    }
-    const newContent = JSON.parse(JSON.stringify(content));
-    const pageSections = newContent.pages?.[pageId]?.sections;
-    if (!Array.isArray(pageSections)) {
-      return;
-    }
-    const [moved] = pageSections.splice(fromIndex, 1);
-    const targetIndex = position === 'after' ? toIndex + 1 : toIndex;
-    const adjustedIndex = fromIndex < targetIndex ? targetIndex - 1 : targetIndex;
-    pageSections.splice(adjustedIndex, 0, moved);
-    updateContent(newContent);
-  };
-
   return (
-    <div className="cms-section-stack">
-      {sections.map((section, index) => (
-        <div
-          key={index}
-          id={getSectionAnchor(section, index)}
-          data-page-id={pageId}
-          data-section-index={index}
-          className="relative"
-          onDragOverCapture={(e) => {
-            if (!canEdit) {
-              return;
-            }
-            e.preventDefault();
-            const rect = e.currentTarget.getBoundingClientRect();
-            const position = e.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
-            setDropIndicator({ index, position });
-          }}
-          onDropCapture={(e) => {
-            if (!canEdit) {
-              return;
-            }
-            e.preventDefault();
-            const fromIndex = readDraggedIndex(e);
-            if (fromIndex !== null) {
+    <div className={nested ? 'space-y-6' : 'cms-section-stack'}>
+      {sections.map((section, index) => {
+        const sectionPath = [...listPath, index];
+        return (
+          <div
+            key={index}
+            id={!nested ? getSectionAnchor(section, index) : undefined}
+            className="relative"
+            onDragOverCapture={(e) => {
+              if (!canEdit) {
+                return;
+              }
+              e.preventDefault();
               const rect = e.currentTarget.getBoundingClientRect();
               const position = e.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
-              moveSection(fromIndex, index, position);
-              setDraggedSectionIndex(null);
-              setDropIndicator(null);
-            }
-          }}
-          onDragLeaveCapture={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-              setDropIndicator((current) => (current?.index === index ? null : current));
-            }
-          }}
-          style={{
-            outline: canEdit && draggedSectionIndex === index ? '2px dashed var(--color-primary)' : undefined,
-            borderRadius: 'var(--border-radius)',
-            scrollMarginTop: '96px',
-          }}
-        >
-          {canEdit && (
-            <button
-              draggable
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragEnd={() => setDraggedSectionIndex(null)}
-              className="absolute top-0 left-0 z-10 w-7 h-7 rounded-full inline-flex items-center justify-center cursor-grab active:cursor-grabbing"
-              style={{
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-text)',
-                border: '1px solid var(--color-border)',
-              }}
-              title="Trascina per riordinare sezione"
-            >
-              <GripVertical className="w-4 h-4" />
-            </button>
-          )}
-          {canEdit && (
-            <button
-              onClick={() => removeSection(index)}
-              className="absolute top-0 right-0 z-10 w-7 h-7 rounded-full inline-flex items-center justify-center"
-              style={{
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-text)',
-                border: '1px solid var(--color-border)',
-              }}
-              title="Elimina sezione"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-          {dropIndicator?.index === index && (
-            <div
-              className="absolute left-0 right-0 z-20 pointer-events-none"
-              style={{
-                [dropIndicator.position === 'before' ? 'top' : 'bottom']: '-8px',
-                height: '4px',
-                backgroundColor: 'var(--color-primary)',
-                borderRadius: '999px',
-                boxShadow: '0 0 0 2px var(--color-background)',
-              }}
-            />
-          )}
-          <SectionRenderer section={section} pageId={pageId} sectionIndex={index} />
-        </div>
-      ))}
+              setDropIndicator({ index, position });
+            }}
+            onDropCapture={(e) => {
+              if (!canEdit) {
+                return;
+              }
+              e.preventDefault();
+              const fromIndex = readDraggedIndex(e);
+              if (fromIndex !== null) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const position = e.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
+                moveSection(fromIndex, index, position);
+                setDraggedSectionIndex(null);
+                setDropIndicator(null);
+              }
+            }}
+            onDragLeaveCapture={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                setDropIndicator((current) => (current?.index === index ? null : current));
+              }
+            }}
+            style={{
+              outline: canEdit && draggedSectionIndex === index ? '2px dashed var(--color-primary)' : undefined,
+              borderRadius: 'var(--border-radius)',
+              scrollMarginTop: nested ? undefined : '96px',
+            }}
+          >
+            {canEdit && (
+              <button
+                draggable
+                onDragStart={(e) => {
+                  setDraggedSectionIndex(index);
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', String(index));
+                }}
+                onDragEnd={() => setDraggedSectionIndex(null)}
+                className="absolute top-0 left-0 z-10 w-7 h-7 rounded-full inline-flex items-center justify-center cursor-grab active:cursor-grabbing"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  color: 'var(--color-text)',
+                  border: '1px solid var(--color-border)',
+                }}
+                title="Trascina per riordinare sezione"
+              >
+                <GripVertical className="w-4 h-4" />
+              </button>
+            )}
+            {canEdit && (
+              <button
+                onClick={() => removeSection(index)}
+                className="absolute top-0 right-0 z-10 w-7 h-7 rounded-full inline-flex items-center justify-center"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  color: 'var(--color-text)',
+                  border: '1px solid var(--color-border)',
+                }}
+                title="Elimina sezione"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+            {dropIndicator?.index === index && (
+              <div
+                className="absolute left-0 right-0 z-20 pointer-events-none"
+                style={{
+                  [dropIndicator.position === 'before' ? 'top' : 'bottom']: '-8px',
+                  height: '4px',
+                  backgroundColor: 'var(--color-primary)',
+                  borderRadius: '999px',
+                  boxShadow: '0 0 0 2px var(--color-background)',
+                }}
+              />
+            )}
+            <SectionRenderer section={section} pageId={pageId} sectionIndex={index} sectionPath={sectionPath} />
+          </div>
+        );
+      })}
       {canEdit && (
         <div
           className="p-4 rounded-lg"
@@ -332,10 +361,10 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
           }}
         >
           <p className="text-sm mb-3" style={{ color: 'var(--color-text-secondary)' }}>
-            Aggiungi una nuova sezione
+            {nested ? 'Aggiungi contenuto nella colonna' : 'Aggiungi una nuova sezione'}
           </p>
           <div className="flex flex-wrap gap-2">
-            {['hero', 'content', 'features', 'services-list', 'blog-list', 'contact-info', 'place', 'calendar', 'events-list', 'youtube'].map((type) => (
+            {SECTION_TYPE_OPTIONS.map((type) => (
               <button
                 key={type}
                 onClick={() => addSection(type)}
@@ -357,6 +386,10 @@ export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
   );
 }
 
+export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
+  return <SectionList sections={sections} listPath={['pages', pageId, 'sections']} pageId={pageId} />;
+}
+
 function getSectionLabel(type: string) {
   const labels: Record<string, string> = {
     hero: 'Hero',
@@ -368,6 +401,9 @@ function getSectionLabel(type: string) {
     place: 'Luogo',
     calendar: 'Calendario',
     'events-list': 'Lista eventi',
+    'layout-1col': 'Layout 1 colonna',
+    'layout-2col': 'Layout 2 colonne',
+    'layout-3col': 'Layout 3 colonne',
     youtube: 'YouTube',
   };
   return labels[type] || type;
@@ -437,6 +473,21 @@ function createSectionTemplate(type: string) {
         title: 'Lista eventi',
         description: 'Indice per data e dettaglio degli eventi del giorno selezionato.',
         indexTitle: 'Indice date',
+      };
+    case 'layout-1col':
+      return {
+        type: 'layout-1col',
+        columns: [{ sections: [] }],
+      };
+    case 'layout-2col':
+      return {
+        type: 'layout-2col',
+        columns: [{ sections: [] }, { sections: [] }],
+      };
+    case 'layout-3col':
+      return {
+        type: 'layout-3col',
+        columns: [{ sections: [] }, { sections: [] }, { sections: [] }],
       };
     case 'youtube':
       return {
@@ -515,34 +566,100 @@ function createItemTemplate(sectionType: string) {
   return {};
 }
 
-function SectionRenderer({ section, pageId, sectionIndex }: { section: Section; pageId: string; sectionIndex: number }) {
+function SectionRenderer({
+  section,
+  pageId,
+  sectionIndex,
+  sectionPath,
+}: {
+  section: Section;
+  pageId: string;
+  sectionIndex: number;
+  sectionPath?: Array<string | number>;
+}) {
   switch (section.type) {
     case 'hero':
-      return <HeroSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+      return <HeroSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'features':
-      return <FeaturesSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+      return <FeaturesSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'content':
-      return <ContentSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+      return <ContentSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'services-list':
-      return <ServicesListSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+      return <ServicesListSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'blog-list':
-      return <BlogListSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+      return <BlogListSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'contact-info':
-      return <ContactInfoSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+      return <ContactInfoSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'place':
-      return <PlaceSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+      return <PlaceSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'calendar':
-      return <CalendarSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+      return <CalendarSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'events-list':
-      return <EventsListSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+      return <EventsListSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
+    case 'layout-1col':
+    case 'layout-2col':
+    case 'layout-3col':
+      return <LayoutColumnsSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     case 'youtube':
-      return <YouTubeSection {...section} pageId={pageId} sectionIndex={sectionIndex} />;
+      return <YouTubeSection {...section} pageId={pageId} sectionIndex={sectionIndex} sectionPath={sectionPath} />;
     default:
       return null;
   }
 }
 
-function YouTubeSection({ title, description, videoUrl, pageId, sectionIndex }: any) {
+function LayoutColumnsSection({
+  type,
+  columns = [],
+  pageId,
+  sectionIndex,
+  sectionPath,
+}: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
+  const normalizedColumns = Array.isArray(columns) ? columns : [];
+  const gridClass =
+    type === 'layout-3col'
+      ? 'md:grid-cols-3'
+      : type === 'layout-2col'
+        ? 'md:grid-cols-2'
+        : 'md:grid-cols-1';
+
+  return (
+    <div
+      className={`grid gap-6 ${gridClass}`}
+      style={{
+        backgroundColor: 'color-mix(in srgb, var(--color-surface) 55%, transparent)',
+        border: '1px dashed var(--color-border)',
+        borderRadius: 'var(--border-radius)',
+        padding: '1rem',
+      }}
+    >
+      {normalizedColumns.map((column: any, columnIndex: number) => (
+        <div
+          key={columnIndex}
+          className="rounded-lg p-3"
+          style={{
+            backgroundColor: 'var(--color-background)',
+            border: '1px solid var(--color-border)',
+            minHeight: '160px',
+          }}
+        >
+          <div className="mb-3 text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+            Colonna {columnIndex + 1}
+          </div>
+          <SectionList
+            sections={Array.isArray(column?.sections) ? column.sections : []}
+            listPath={[...basePath, 'columns', columnIndex, 'sections']}
+            pageId={pageId}
+            nested
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function YouTubeSection({ title, description, videoUrl, pageId, sectionIndex, sectionPath }: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
   const { canEdit } = useAdmin();
   const embedUrl = buildYouTubeEmbedUrl(videoUrl);
 
@@ -559,7 +676,7 @@ function YouTubeSection({ title, description, videoUrl, pageId, sectionIndex }: 
         >
           <InlineEditor
             value={title}
-            path={['pages', pageId, 'sections', sectionIndex, 'title']}
+            path={[...basePath, 'title']}
           />
         </h2>
         <p
@@ -572,7 +689,7 @@ function YouTubeSection({ title, description, videoUrl, pageId, sectionIndex }: 
           <InlineEditor
             value={description}
             type="textarea"
-            path={['pages', pageId, 'sections', sectionIndex, 'description']}
+            path={[...basePath, 'description']}
           />
         </p>
         <div>
@@ -581,7 +698,7 @@ function YouTubeSection({ title, description, videoUrl, pageId, sectionIndex }: 
           </div>
           <InlineEditor
             value={videoUrl}
-            path={['pages', pageId, 'sections', sectionIndex, 'videoUrl']}
+            path={[...basePath, 'videoUrl']}
           />
           {canEdit && (
             <div className="mt-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
@@ -619,7 +736,8 @@ function YouTubeSection({ title, description, videoUrl, pageId, sectionIndex }: 
   );
 }
 
-function CalendarSection({ title, description, entries, notes, pageId, sectionIndex }: any) {
+function CalendarSection({ title, description, entries, notes, pageId, sectionIndex, sectionPath }: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
   const { canEdit, site, updateSite } = useAdmin();
   const parsed = parseCalendarInput(entries);
   const events = getSiteEventsSorted(site?.events || []);
@@ -674,7 +792,7 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
         >
           <InlineEditor
             value={title}
-            path={['pages', pageId, 'sections', sectionIndex, 'title']}
+            path={[...basePath, 'title']}
           />
         </h2>
         <p
@@ -687,7 +805,7 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
           <InlineEditor
             value={description}
             type="textarea"
-            path={['pages', pageId, 'sections', sectionIndex, 'description']}
+            path={[...basePath, 'description']}
           />
         </p>
         <div>
@@ -700,7 +818,7 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
           <InlineEditor
             value={entries}
             type="textarea"
-            path={['pages', pageId, 'sections', sectionIndex, 'entries']}
+            path={[...basePath, 'entries']}
           />
           {canEdit && (
             <div
@@ -740,7 +858,7 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
           <InlineEditor
             value={notes}
             type="textarea"
-            path={['pages', pageId, 'sections', sectionIndex, 'notes']}
+            path={[...basePath, 'notes']}
           />
         </p>
       </div>
@@ -804,7 +922,8 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
   );
 }
 
-function EventsListSection({ title, description, indexTitle = 'Indice date', pageId, sectionIndex }: any) {
+function EventsListSection({ title, description, indexTitle = 'Indice date', pageId, sectionIndex, sectionPath }: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
   const { canEdit, site, updateSite, menu, content } = useAdmin();
   const events = getSiteEventsSorted(site?.events || []);
   const eventsByDate = groupEventsByDate(events);
@@ -867,7 +986,7 @@ function EventsListSection({ title, description, indexTitle = 'Indice date', pag
         >
           <InlineEditor
             value={title}
-            path={['pages', pageId, 'sections', sectionIndex, 'title']}
+            path={[...basePath, 'title']}
           />
         </h2>
         <p
@@ -880,7 +999,7 @@ function EventsListSection({ title, description, indexTitle = 'Indice date', pag
           <InlineEditor
             value={description}
             type="textarea"
-            path={['pages', pageId, 'sections', sectionIndex, 'description']}
+            path={[...basePath, 'description']}
           />
         </p>
         <div
@@ -893,7 +1012,7 @@ function EventsListSection({ title, description, indexTitle = 'Indice date', pag
           <div className="mb-3 text-sm font-medium" style={{ color: 'var(--color-text)' }}>
             <InlineEditor
               value={indexTitle}
-              path={['pages', pageId, 'sections', sectionIndex, 'indexTitle']}
+              path={[...basePath, 'indexTitle']}
             />
           </div>
           <div className="mb-4">
@@ -1174,7 +1293,9 @@ function PlaceSection({
   geocodedAddress,
   pageId,
   sectionIndex,
+  sectionPath,
 }: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
   const { content, updateContent } = useAdmin();
   const [runtimeCoords, setRuntimeCoords] = useState<{ lat: number; lng: number } | null>(
     typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : null,
@@ -1226,7 +1347,7 @@ function PlaceSection({
         setMapError('');
 
         const newContent = JSON.parse(JSON.stringify(content));
-        const targetSection = newContent.pages?.[pageId]?.sections?.[sectionIndex];
+        const targetSection = getValueAtPath(newContent, basePath);
         if (!targetSection) {
           return;
         }
@@ -1288,7 +1409,7 @@ function PlaceSection({
             setRuntimeZoom(nextZoom);
 
             const newContent = JSON.parse(JSON.stringify(contentRef.current));
-            const targetSection = newContent.pages?.[pageId]?.sections?.[sectionIndex];
+            const targetSection = getValueAtPath(newContent, basePath);
             if (!targetSection || targetSection.zoom === nextZoom) {
               return;
             }
@@ -1336,7 +1457,7 @@ function PlaceSection({
         >
           <InlineEditor
             value={title}
-            path={['pages', pageId, 'sections', sectionIndex, 'title']}
+            path={[...basePath, 'title']}
           />
         </h2>
         <div
@@ -1357,7 +1478,7 @@ function PlaceSection({
             <InlineEditor
               value={address}
               type="textarea"
-              path={['pages', pageId, 'sections', sectionIndex, 'address']}
+              path={[...basePath, 'address']}
             />
           </div>
         </div>
@@ -1371,7 +1492,7 @@ function PlaceSection({
           <InlineEditor
             value={description}
             type="textarea"
-            path={['pages', pageId, 'sections', sectionIndex, 'description']}
+            path={[...basePath, 'description']}
           />
         </p>
         {mapError && (
@@ -1412,7 +1533,8 @@ function PlaceSection({
   );
 }
 
-function HeroSection({ title, subtitle, image, imageHeight = 256, imagePosX = 50, imagePosY = 50, imageScale = 100, cta, pageId, sectionIndex }: any) {
+function HeroSection({ title, subtitle, image, imageHeight = 256, imagePosX = 50, imagePosY = 50, imageScale = 100, cta, pageId, sectionIndex, sectionPath }: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
   const { canEdit, menu, content, updateContent } = useAdmin();
   const ctaText = cta?.text || 'Scopri di più';
   const ctaLink = cta?.link || '/';
@@ -1420,7 +1542,7 @@ function HeroSection({ title, subtitle, image, imageHeight = 256, imagePosX = 50
 
   const updateHeroCtaLink = (nextLink: string) => {
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetSection = newContent.pages?.[pageId]?.sections?.[sectionIndex];
+    const targetSection = getValueAtPath(newContent, basePath);
     if (!targetSection?.cta) {
       return;
     }
@@ -1435,11 +1557,11 @@ function HeroSection({ title, subtitle, image, imageHeight = 256, imagePosX = 50
           <InlineImagePositionEditor
             src={image}
             alt={title}
-            path={['pages', pageId, 'sections', sectionIndex, 'image']}
-            frameHeightPath={['pages', pageId, 'sections', sectionIndex, 'imageHeight']}
-            posXPath={['pages', pageId, 'sections', sectionIndex, 'imagePosX']}
-            posYPath={['pages', pageId, 'sections', sectionIndex, 'imagePosY']}
-            scalePath={['pages', pageId, 'sections', sectionIndex, 'imageScale']}
+            path={[...basePath, 'image']}
+            frameHeightPath={[...basePath, 'imageHeight']}
+            posXPath={[...basePath, 'imagePosX']}
+            posYPath={[...basePath, 'imagePosY']}
+            scalePath={[...basePath, 'imageScale']}
             frameHeight={imageHeight}
             posX={imagePosX}
             posY={imagePosY}
@@ -1459,7 +1581,7 @@ function HeroSection({ title, subtitle, image, imageHeight = 256, imagePosX = 50
       >
         <InlineEditor
           value={title}
-          path={['pages', pageId, 'sections', sectionIndex, 'title']}
+          path={[...basePath, 'title']}
         />
       </h1>
       <p 
@@ -1473,7 +1595,7 @@ function HeroSection({ title, subtitle, image, imageHeight = 256, imagePosX = 50
         <InlineEditor
           value={subtitle}
           type="textarea"
-          path={['pages', pageId, 'sections', sectionIndex, 'subtitle']}
+          path={[...basePath, 'subtitle']}
         />
       </p>
       {cta && (
@@ -1494,27 +1616,17 @@ function HeroSection({ title, subtitle, image, imageHeight = 256, imagePosX = 50
           >
             <InlineEditor
               value={ctaText}
-              path={['pages', pageId, 'sections', sectionIndex, 'cta', 'text']}
+              path={[...basePath, 'cta', 'text']}
             />
             <ArrowRight className="w-5 h-5" />
           </Link>
           {canEdit && (
-            <div className="w-full max-w-md space-y-2">
+            <div className="w-full max-w-md">
               <SlugSelectField
                 label="Slug destinazione CTA"
                 value={ctaLink}
                 options={slugOptions}
                 onChange={updateHeroCtaLink}
-              />
-              <InlineEditor
-                value={ctaLink}
-                path={['pages', pageId, 'sections', sectionIndex, 'cta', 'link']}
-                className="block w-full rounded px-3 py-2 text-sm"
-                style={{
-                  backgroundColor: 'var(--color-background)',
-                  color: 'var(--color-text)',
-                  border: '1px solid var(--color-border)',
-                }}
               />
             </div>
           )}
@@ -1524,70 +1636,37 @@ function HeroSection({ title, subtitle, image, imageHeight = 256, imagePosX = 50
   );
 }
 
-function FeaturesSection({ title, items, pageId, sectionIndex }: any) {
+function FeaturesSection({ title, items, pageId, sectionIndex, sectionPath }: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
   const { canEdit, content, updateContent } = useAdmin();
 
   const handleAddCard = () => {
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetItems = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.items;
-    if (!Array.isArray(targetItems)) {
-      return;
-    }
+    const targetItems = getValueAtPath(newContent, [...basePath, 'items']);
+    if (!Array.isArray(targetItems)) return;
     targetItems.push(createItemTemplate('features'));
     updateContent(newContent);
   };
 
   const handleDeleteCard = (itemIndex: number) => {
-    const confirmed = window.confirm('Vuoi eliminare questa card?');
-    if (!confirmed) {
-      return;
-    }
+    if (!window.confirm('Vuoi eliminare questa card?')) return;
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetItems = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.items;
-    if (!Array.isArray(targetItems)) {
-      return;
-    }
+    const targetItems = getValueAtPath(newContent, [...basePath, 'items']);
+    if (!Array.isArray(targetItems)) return;
     targetItems.splice(itemIndex, 1);
     updateContent(newContent);
   };
 
   return (
     <div>
-      <h2 
-        className="text-3xl md:text-4xl font-bold text-center mb-12"
-        style={{ 
-          color: 'var(--color-text)',
-          fontFamily: 'var(--font-h2)',
-          fontSize: 'var(--size-h2)',
-        }}
-      >
-        <InlineEditor
-          value={title}
-          path={['pages', pageId, 'sections', sectionIndex, 'title']}
-        />
+      <h2 className="text-3xl md:text-4xl font-bold text-center mb-12" style={{ color: 'var(--color-text)', fontFamily: 'var(--font-h2)', fontSize: 'var(--size-h2)' }}>
+        <InlineEditor value={title} path={[...basePath, 'title']} />
       </h2>
       <div className="grid md:grid-cols-3 gap-8">
         {items.map((item: any, index: number) => (
-          <div
-            key={index}
-            className="p-6 rounded-lg overflow-hidden relative"
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--border-radius)'
-            }}
-          >
+          <div key={index} className="p-6 rounded-lg overflow-hidden relative" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--border-radius)' }}>
             {canEdit && (
-              <button
-                onClick={() => handleDeleteCard(index)}
-                className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full inline-flex items-center justify-center"
-                style={{
-                  backgroundColor: 'var(--color-background)',
-                  color: 'var(--color-text)',
-                  border: '1px solid var(--color-border)',
-                }}
-                title="Elimina card"
-              >
+              <button onClick={() => handleDeleteCard(index)} className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full inline-flex items-center justify-center" style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }} title="Elimina card">
                 <X className="w-4 h-4" />
               </button>
             )}
@@ -1596,11 +1675,11 @@ function FeaturesSection({ title, items, pageId, sectionIndex }: any) {
                 <InlineImagePositionEditor
                   src={item.image}
                   alt={item.title}
-                  path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'image']}
-                  frameHeightPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageHeight']}
-                  posXPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosX']}
-                  posYPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosY']}
-                  scalePath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageScale']}
+                  path={[...basePath, 'items', index, 'image']}
+                  frameHeightPath={[...basePath, 'items', index, 'imageHeight']}
+                  posXPath={[...basePath, 'items', index, 'imagePosX']}
+                  posYPath={[...basePath, 'items', index, 'imagePosY']}
+                  scalePath={[...basePath, 'items', index, 'imageScale']}
                   frameHeight={item.imageHeight ?? 192}
                   posX={item.imagePosX}
                   posY={item.imagePosY}
@@ -1609,45 +1688,18 @@ function FeaturesSection({ title, items, pageId, sectionIndex }: any) {
                 />
               </div>
             )}
-            <h3 
-              className="text-xl font-bold mb-3"
-              style={{
-                color: 'var(--color-primary)',
-                fontFamily: 'var(--font-h3)',
-                fontSize: 'var(--size-h3)',
-              }}
-            >
-              <InlineEditor
-                value={item.title}
-                path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'title']}
-              />
+            <h3 className="text-xl font-bold mb-3" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-h3)', fontSize: 'var(--size-h3)' }}>
+              <InlineEditor value={item.title} path={[...basePath, 'items', index, 'title']} />
             </h3>
-            <p
-              style={{
-                color: 'var(--color-text-secondary)',
-                fontFamily: 'var(--font-body-copy)',
-                fontSize: 'var(--size-body-copy)',
-              }}
-            >
-              <InlineEditor
-                value={item.description}
-                type="textarea"
-                path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'description']}
-              />
+            <p style={{ color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body-copy)', fontSize: 'var(--size-body-copy)' }}>
+              <InlineEditor value={item.description} type="textarea" path={[...basePath, 'items', index, 'description']} />
             </p>
           </div>
         ))}
       </div>
       {canEdit && (
         <div className="mt-4">
-          <button
-            onClick={handleAddCard}
-            className="px-3 py-2 rounded text-sm font-medium inline-flex items-center gap-2"
-            style={{
-              backgroundColor: 'var(--color-primary)',
-              color: '#ffffff',
-            }}
-          >
+          <button onClick={handleAddCard} className="px-3 py-2 rounded text-sm font-medium inline-flex items-center gap-2" style={{ backgroundColor: 'var(--color-primary)', color: '#ffffff' }}>
             <Plus className="w-4 h-4" />
             Aggiungi card
           </button>
@@ -1669,8 +1721,10 @@ function ContentSection({
   imagePlacementX = 'right',
   imagePlacementY = 'top',
   pageId,
-  sectionIndex
+  sectionIndex,
+  sectionPath,
 }: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
   const { canEdit, content: siteContent, updateContent } = useAdmin();
   // Compatibilità con vecchio campo singolo imagePlacement
   const fallbackX = imagePlacement === 'left' || imagePlacement === 'right' ? imagePlacement : 'right';
@@ -1680,7 +1734,7 @@ function ContentSection({
 
   const updatePlacementX = (value: 'left' | 'right') => {
     const newContent = JSON.parse(JSON.stringify(siteContent));
-    const targetSection = newContent.pages?.[pageId]?.sections?.[sectionIndex];
+    const targetSection = getValueAtPath(newContent, basePath);
     if (!targetSection) {
       return;
     }
@@ -1690,7 +1744,7 @@ function ContentSection({
 
   const updatePlacementY = (value: 'top' | 'bottom') => {
     const newContent = JSON.parse(JSON.stringify(siteContent));
-    const targetSection = newContent.pages?.[pageId]?.sections?.[sectionIndex];
+    const targetSection = getValueAtPath(newContent, basePath);
     if (!targetSection) {
       return;
     }
@@ -1708,10 +1762,7 @@ function ContentSection({
           fontSize: 'var(--size-h2)',
         }}
       >
-        <InlineEditor
-          value={title}
-          path={['pages', pageId, 'sections', sectionIndex, 'title']}
-        />
+        <InlineEditor value={title} path={[...basePath, 'title']} />
       </h2>
       <p 
         className="text-lg leading-relaxed"
@@ -1721,11 +1772,7 @@ function ContentSection({
           fontSize: 'var(--size-body-copy)',
         }}
       >
-        <InlineEditor
-          value={content}
-          type="textarea"
-          path={['pages', pageId, 'sections', sectionIndex, 'content']}
-        />
+        <InlineEditor value={content} type="textarea" path={[...basePath, 'content']} />
       </p>
     </div>
   );
@@ -1796,11 +1843,11 @@ function ContentSection({
       <InlineImagePositionEditor
         src={image}
         alt={title}
-        path={['pages', pageId, 'sections', sectionIndex, 'image']}
-        frameHeightPath={['pages', pageId, 'sections', sectionIndex, 'imageHeight']}
-        posXPath={['pages', pageId, 'sections', sectionIndex, 'imagePosX']}
-        posYPath={['pages', pageId, 'sections', sectionIndex, 'imagePosY']}
-        scalePath={['pages', pageId, 'sections', sectionIndex, 'imageScale']}
+        path={[...basePath, 'image']}
+        frameHeightPath={[...basePath, 'imageHeight']}
+        posXPath={[...basePath, 'imagePosX']}
+        posYPath={[...basePath, 'imagePosY']}
+        scalePath={[...basePath, 'imageScale']}
         frameHeight={imageHeight}
         posX={imagePosX}
         posY={imagePosY}
@@ -1833,13 +1880,14 @@ function ContentSection({
   );
 }
 
-function ServicesListSection({ items, pageId, sectionIndex }: any) {
+function ServicesListSection({ items, pageId, sectionIndex, sectionPath }: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
   const { canEdit, content, updateContent } = useAdmin();
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
 
   const handleAddCard = () => {
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetItems = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.items;
+    const targetItems = getValueAtPath(newContent, [...basePath, 'items']);
     if (!Array.isArray(targetItems)) {
       return;
     }
@@ -1853,7 +1901,7 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
       return;
     }
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetItems = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.items;
+    const targetItems = getValueAtPath(newContent, [...basePath, 'items']);
     if (!Array.isArray(targetItems)) {
       return;
     }
@@ -1866,7 +1914,7 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
       return;
     }
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetItems = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.items;
+    const targetItems = getValueAtPath(newContent, [...basePath, 'items']);
     if (!Array.isArray(targetItems)) {
       return;
     }
@@ -1955,11 +2003,11 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
               <InlineImagePositionEditor
                 src={item.image}
                 alt={item.title}
-                path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'image']}
-                frameHeightPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageHeight']}
-                posXPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosX']}
-                posYPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosY']}
-                scalePath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageScale']}
+                path={[...basePath, 'items', index, 'image']}
+                frameHeightPath={[...basePath, 'items', index, 'imageHeight']}
+                posXPath={[...basePath, 'items', index, 'imagePosX']}
+                posYPath={[...basePath, 'items', index, 'imagePosY']}
+                scalePath={[...basePath, 'items', index, 'imageScale']}
                 frameHeight={item.imageHeight ?? 192}
                 posX={item.imagePosX}
                 posY={item.imagePosY}
@@ -1979,7 +2027,7 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
             >
               <InlineEditor
                 value={item.title}
-                path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'title']}
+                path={[...basePath, 'items', index, 'title']}
               />
             </h3>
             <p 
@@ -1993,7 +2041,7 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
               <InlineEditor
                 value={item.description}
                 type="textarea"
-                path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'description']}
+                path={[...basePath, 'items', index, 'description']}
               />
             </p>
             <div className="flex flex-wrap gap-2">
@@ -2031,13 +2079,14 @@ function ServicesListSection({ items, pageId, sectionIndex }: any) {
   );
 }
 
-function BlogListSection({ items, pageId, sectionIndex }: any) {
+function BlogListSection({ items, pageId, sectionIndex, sectionPath }: any) {
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
   const { canEdit, content, updateContent } = useAdmin();
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
 
   const handleAddCard = () => {
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetItems = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.items;
+    const targetItems = getValueAtPath(newContent, [...basePath, 'items']);
     if (!Array.isArray(targetItems)) {
       return;
     }
@@ -2051,7 +2100,7 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
       return;
     }
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetItems = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.items;
+    const targetItems = getValueAtPath(newContent, [...basePath, 'items']);
     if (!Array.isArray(targetItems)) {
       return;
     }
@@ -2064,7 +2113,7 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
       return;
     }
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetItems = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.items;
+    const targetItems = getValueAtPath(newContent, [...basePath, 'items']);
     if (!Array.isArray(targetItems)) {
       return;
     }
@@ -2154,11 +2203,11 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
                 <InlineImagePositionEditor
                   src={item.image}
                   alt={item.title}
-                  path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'image']}
-                  frameHeightPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageHeight']}
-                  posXPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosX']}
-                  posYPath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imagePosY']}
-                  scalePath={['pages', pageId, 'sections', sectionIndex, 'items', index, 'imageScale']}
+                  path={[...basePath, 'items', index, 'image']}
+                  frameHeightPath={[...basePath, 'items', index, 'imageHeight']}
+                  posXPath={[...basePath, 'items', index, 'imagePosX']}
+                  posYPath={[...basePath, 'items', index, 'imagePosY']}
+                  scalePath={[...basePath, 'items', index, 'imageScale']}
                   frameHeight={item.imageHeight ?? 192}
                   posX={item.imagePosX}
                   posY={item.imagePosY}
@@ -2178,7 +2227,7 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
               >
                 <InlineEditor
                   value={item.title}
-                  path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'title']}
+                  path={[...basePath, 'items', index, 'title']}
                 />
               </h3>
               <p 
@@ -2192,7 +2241,7 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
                 <InlineEditor
                   value={item.excerpt}
                   type="textarea"
-                  path={['pages', pageId, 'sections', sectionIndex, 'items', index, 'excerpt']}
+                  path={[...basePath, 'items', index, 'excerpt']}
                 />
               </p>
               <div 
@@ -2223,9 +2272,10 @@ function BlogListSection({ items, pageId, sectionIndex }: any) {
   );
 }
 
-function ContactInfoSection({ info, pageId, sectionIndex }: any) {
+function ContactInfoSection({ info, pageId, sectionIndex, sectionPath }: any) {
   const { canEdit, content, updateContent } = useAdmin();
   const [draggedInfoIndex, setDraggedInfoIndex] = useState<number | null>(null);
+  const basePath = getSectionBasePath(pageId, sectionIndex, sectionPath);
   const icons: { [key: string]: any } = {
     Email: Mail,
     Telefono: Phone,
@@ -2234,7 +2284,7 @@ function ContactInfoSection({ info, pageId, sectionIndex }: any) {
 
   const handleAddCard = () => {
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetItems = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.info;
+    const targetItems = getValueAtPath(newContent, [...basePath, 'info']);
     if (!Array.isArray(targetItems)) {
       return;
     }
@@ -2248,7 +2298,7 @@ function ContactInfoSection({ info, pageId, sectionIndex }: any) {
       return;
     }
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetItems = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.info;
+    const targetItems = getValueAtPath(newContent, [...basePath, 'info']);
     if (!Array.isArray(targetItems)) {
       return;
     }
@@ -2261,7 +2311,7 @@ function ContactInfoSection({ info, pageId, sectionIndex }: any) {
       return;
     }
     const newContent = JSON.parse(JSON.stringify(content));
-    const targetItems = newContent.pages?.[pageId]?.sections?.[sectionIndex]?.info;
+    const targetItems = getValueAtPath(newContent, [...basePath, 'info']);
     if (!Array.isArray(targetItems)) {
       return;
     }
@@ -2375,7 +2425,7 @@ function ContactInfoSection({ info, pageId, sectionIndex }: any) {
                 >
                   <InlineEditor
                     value={item.value}
-                    path={['pages', pageId, 'sections', sectionIndex, 'info', index, 'value']}
+                    path={[...basePath, 'info', index, 'value']}
                   />
                 </div>
               </div>

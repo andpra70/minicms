@@ -578,10 +578,10 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
   }, [eventsByDate, selectedDateKey]);
 
   const patchEvents = (nextEvents: SiteEvent[]) => {
-    updateSite({
-      ...site,
-      events: nextEvents.sort(compareEvents),
-    });
+    updateSite((prevSite: any) => ({
+      ...(prevSite || {}),
+      events: [...nextEvents].sort(compareEvents),
+    }));
   };
 
   const handleAddEvent = (date: string) => {
@@ -763,10 +763,10 @@ function EventsListSection({ title, description, indexTitle = 'Indice date', pag
   const selectedEvents = selectedDateKey ? eventsByDate[selectedDateKey] || [] : [];
 
   const patchEvents = (nextEvents: SiteEvent[]) => {
-    updateSite({
-      ...site,
-      events: nextEvents.sort(compareEvents),
-    });
+    updateSite((prevSite: any) => ({
+      ...(prevSite || {}),
+      events: [...nextEvents].sort(compareEvents),
+    }));
   };
 
   const updateEvent = (eventId: string, patch: Partial<SiteEvent>) => {

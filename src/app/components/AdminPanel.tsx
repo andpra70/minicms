@@ -1257,11 +1257,7 @@ function ContentActions({ site, updateSite }: { site: any; updateSite: (newSite:
   };
 
   return (
-    <div
-      className="flex flex-col items-end gap-2"
-      onMouseEnter={() => setIsMenuOpen(true)}
-      onMouseLeave={() => setIsMenuOpen(false)}
-    >
+    <div className="flex flex-col items-end gap-2">
       <div
         className={`rounded-lg shadow-2xl p-2 flex flex-col gap-2 min-w-56 transition-all duration-200 ${isMenuOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}
         style={{

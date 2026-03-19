@@ -747,6 +747,7 @@ function EventsListSection({ title, description, indexTitle = 'Indice date', pag
   const eventsByDate = groupEventsByDate(events);
   const orderedDates = Object.keys(eventsByDate).sort();
   const [selectedDateKey, setSelectedDateKey] = useState<string>(orderedDates[0] || '');
+  const [isMiniCalendarOpen, setIsMiniCalendarOpen] = useState(false);
 
   useEffect(() => {
     if (orderedDates.length === 0) {
@@ -831,51 +832,73 @@ function EventsListSection({ title, description, indexTitle = 'Indice date', pag
               path={['pages', pageId, 'sections', sectionIndex, 'indexTitle']}
             />
           </div>
-          <div
-            className="mb-4 rounded-lg p-2"
-            style={{
-              backgroundColor: 'var(--color-background)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            <Calendar
-              showOutsideDays
-              month={selectedDateKey ? parseISO(selectedDateKey) : undefined}
-              selected={selectedDateKey ? parseISO(selectedDateKey) : undefined}
-              onDayClick={(day) => setSelectedDateKey(format(day, 'yyyy-MM-dd'))}
-              classNames={{
-                month: 'flex w-full flex-col gap-2',
-                caption_label: 'text-xs font-semibold',
-                head_cell: 'text-muted-foreground rounded-md flex-1 font-normal text-[0.65rem]',
-                row: 'flex w-full mt-1',
-                day: 'h-9 w-full rounded-md p-0 text-xs font-normal aria-selected:opacity-100',
-                day_today: 'bg-accent text-accent-foreground rounded-md',
-                day_selected: 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground rounded-md',
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => setIsMiniCalendarOpen((prev) => !prev)}
+              className="w-full rounded px-3 py-2 text-left text-sm"
+              style={{
+                backgroundColor: 'var(--color-background)',
+                color: 'var(--color-text)',
+                border: '1px solid var(--color-border)',
               }}
-              components={{
-                DayContent: ({ date }: any) => {
-                  const dateKey = format(date, 'yyyy-MM-dd');
-                  const count = eventsByDate[dateKey]?.length || 0;
-                  return (
-                    <div className="relative flex h-full w-full flex-col items-center justify-center">
-                      <span>{format(date, 'd')}</span>
-                      {count > 0 && (
-                        <span
-                          className="absolute bottom-0.5 right-0.5 inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[9px] leading-none"
-                          style={{
-                            backgroundColor: 'var(--color-primary)',
-                            color: '#ffffff',
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </div>
-                  );
-                },
-              }}
-              className="mx-auto max-w-[240px]"
-            />
+            >
+              {isMiniCalendarOpen ? 'Nascondi mini calendario' : 'Mostra mini calendario'}
+            </button>
+            {isMiniCalendarOpen && (
+              <div
+                className="mt-2 rounded-lg p-1.5"
+                style={{
+                  backgroundColor: 'var(--color-background)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <Calendar
+                  showOutsideDays
+                  month={selectedDateKey ? parseISO(selectedDateKey) : undefined}
+                  selected={selectedDateKey ? parseISO(selectedDateKey) : undefined}
+                  onDayClick={(day) => {
+                    setSelectedDateKey(format(day, 'yyyy-MM-dd'));
+                    setIsMiniCalendarOpen(false);
+                  }}
+                  classNames={{
+                    months: 'flex w-full flex-col gap-1',
+                    month: 'flex w-full flex-col gap-1',
+                    caption: 'flex justify-center pt-0 relative items-center w-full',
+                    caption_label: 'text-[11px] font-semibold',
+                    nav_button: 'size-6 bg-transparent p-0 opacity-70 hover:opacity-100',
+                    head_cell: 'text-muted-foreground rounded-md flex-1 font-normal text-[0.6rem]',
+                    row: 'flex w-full mt-0.5',
+                    day: 'h-7 w-full rounded-md p-0 text-[11px] font-normal aria-selected:opacity-100',
+                    day_today: 'bg-accent text-accent-foreground rounded-md',
+                    day_selected: 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground rounded-md',
+                  }}
+                  components={{
+                    DayContent: ({ date }: any) => {
+                      const dateKey = format(date, 'yyyy-MM-dd');
+                      const count = eventsByDate[dateKey]?.length || 0;
+                      return (
+                        <div className="relative flex h-full w-full flex-col items-center justify-center">
+                          <span>{format(date, 'd')}</span>
+                          {count > 0 && (
+                            <span
+                              className="absolute bottom-0 right-0 inline-flex min-w-3 items-center justify-center rounded-full px-0.5 text-[8px] leading-none"
+                              style={{
+                                backgroundColor: 'var(--color-primary)',
+                                color: '#ffffff',
+                              }}
+                            >
+                              {count}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    },
+                  }}
+                  className="mx-auto max-w-[190px] p-1"
+                />
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             {orderedDates.map((dateKey) => (

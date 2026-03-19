@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Palette, Plus, Pencil } from 'lucide-react';
+import { Menu, X, Palette, Plus, Pencil, ChevronUp, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import type { DragEvent } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -12,6 +12,31 @@ interface MenuItem {
   children?: MenuItem[];
 }
 
+function hexToRgb(hex: string) {
+  const normalized = hex.replace('#', '').trim();
+  if (normalized.length !== 6) {
+    return null;
+  }
+  const value = Number.parseInt(normalized, 16);
+  if (Number.isNaN(value)) {
+    return null;
+  }
+  return {
+    r: (value >> 16) & 255,
+    g: (value >> 8) & 255,
+    b: value & 255,
+  };
+}
+
+function getThemeContrastMode(background: string) {
+  const rgb = hexToRgb(background);
+  if (!rgb) {
+    return 'day';
+  }
+  const luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
+  return luminance < 0.5 ? 'night' : 'day';
+}
+
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
@@ -21,7 +46,7 @@ export function Header() {
   const [dropIndicator, setDropIndicator] = useState<{ level: 'top' | 'child'; itemId: string; parentId?: string; position: 'before' | 'after' } | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { theme, setTheme, availableThemes } = useTheme();
+  const { theme, updateTheme } = useTheme();
   const { isAdmin, canEdit, menu, updateMenu, content, updateContent, site, updateSite } = useAdmin();
 
   const menuItems: MenuItem[] = Array.isArray(menu?.items) ? menu.items : [];
@@ -36,6 +61,22 @@ export function Header() {
   const isActive = (item: MenuItem) => {
     if (location.pathname === item.path) return true;
     return (item.children || []).some((child) => location.pathname === child.path);
+  };
+  const contrastMode = getThemeContrastMode(theme.colors.background);
+
+  const applyContrastMode = (mode: 'day' | 'night') => {
+    updateTheme({
+      ...theme,
+      colors: {
+        ...theme.colors,
+        background: mode === 'night' ? '#0f172a' : '#ffffff',
+        surface: mode === 'night' ? '#1e293b' : '#f8fafc',
+        text: mode === 'night' ? '#f1f5f9' : '#0f172a',
+        textSecondary: mode === 'night' ? '#94a3b8' : '#64748b',
+        border: mode === 'night' ? '#334155' : '#e2e8f0',
+      },
+    });
+    setThemeMenuOpen(false);
   };
 
   const hasRouteConflict = (id: string, path: string) => {
@@ -101,6 +142,20 @@ export function Header() {
     }
     parent.children = reorderById(parent.children, fromId, toId, position);
     updateMenu(newMenu);
+  };
+
+  const moveChildMenuItemByOffset = (parentId: string, itemId: string, direction: 'up' | 'down') => {
+    const parent = menuItems.find((item) => item.id === parentId);
+    const children = parent?.children || [];
+    const currentIndex = children.findIndex((child) => child.id === itemId);
+    if (currentIndex < 0) {
+      return;
+    }
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= children.length) {
+      return;
+    }
+    moveChildMenuItem(parentId, itemId, children[targetIndex].id, direction === 'up' ? 'before' : 'after');
   };
 
   const ensureContentPage = (pageId: string, label: string) => {
@@ -580,7 +635,7 @@ export function Header() {
                         border: '1px solid var(--color-border)',
                       }}
                     >
-                      {(item.children || []).map((child) => (
+                      {(item.children || []).map((child, childIndex, childItems) => (
                         <div
                           key={child.id}
                           className="px-3 py-2 flex items-center gap-2"
@@ -634,6 +689,36 @@ export function Header() {
                           >
                             {child.label}
                           </Link>
+                          {canEdit && (
+                            <button
+                              onClick={() => moveChildMenuItemByOffset(item.id, child.id, 'up')}
+                              disabled={childIndex === 0}
+                              className="w-6 h-6 rounded-full inline-flex items-center justify-center disabled:opacity-40"
+                              style={{
+                                backgroundColor: 'var(--color-background)',
+                                color: 'var(--color-text)',
+                                border: '1px solid var(--color-border)',
+                              }}
+                              title={`Sposta su ${child.label}`}
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                          )}
+                          {canEdit && (
+                            <button
+                              onClick={() => moveChildMenuItemByOffset(item.id, child.id, 'down')}
+                              disabled={childIndex === childItems.length - 1}
+                              className="w-6 h-6 rounded-full inline-flex items-center justify-center disabled:opacity-40"
+                              style={{
+                                backgroundColor: 'var(--color-background)',
+                                color: 'var(--color-text)',
+                                border: '1px solid var(--color-border)',
+                              }}
+                              title={`Sposta giu ${child.label}`}
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                          )}
                           {canEdit && (
                             <button
                               onClick={() => handleEditRouteLabel(child, item.id)}
@@ -701,27 +786,29 @@ export function Header() {
 
               {themeMenuOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg overflow-hidden"
+                  className="absolute right-0 mt-2 w-44 rounded-lg shadow-lg overflow-hidden"
                   style={{
                     backgroundColor: 'var(--color-surface)',
                     border: '1px solid var(--color-border)',
                   }}
                 >
-                  {availableThemes.map((t) => (
+                  {(['day', 'night'] as const).map((mode) => (
                     <button
-                      key={t.id}
-                      onClick={() => {
-                        setTheme(t.id);
-                        setThemeMenuOpen(false);
-                      }}
+                      key={mode}
+                      onClick={() => applyContrastMode(mode)}
                       className="w-full px-4 py-3 text-left flex items-center gap-3 transition-colors"
                       style={{
-                        backgroundColor: theme.id === t.id ? 'var(--color-background)' : 'transparent',
+                        backgroundColor: contrastMode === mode ? 'var(--color-background)' : 'transparent',
                         color: 'var(--color-text)',
                       }}
                     >
-                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.colors.primary }} />
-                      <span className={theme.id === t.id ? 'font-semibold' : ''}>{t.name}</span>
+                      <div
+                        className="w-4 h-4 rounded-full"
+                        style={{ backgroundColor: mode === 'night' ? '#0f172a' : '#ffffff', border: '1px solid var(--color-border)' }}
+                      />
+                      <span className={contrastMode === mode ? 'font-semibold' : ''}>
+                        {mode === 'night' ? 'Night' : 'Day'}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -838,7 +925,7 @@ export function Header() {
                   )}
                 </div>
 
-                {(item.children || []).map((child) => (
+                {(item.children || []).map((child, childIndex, childItems) => (
                   <div
                     key={child.id}
                     className="pl-4 flex items-center gap-2"
@@ -896,6 +983,36 @@ export function Header() {
                     </Link>
                     {canEdit && (
                       <button
+                        onClick={() => moveChildMenuItemByOffset(item.id, child.id, 'up')}
+                        disabled={childIndex === 0}
+                        className="w-7 h-7 rounded-full inline-flex items-center justify-center disabled:opacity-40"
+                        style={{
+                          backgroundColor: 'var(--color-background)',
+                          color: 'var(--color-text)',
+                          border: '1px solid var(--color-border)',
+                        }}
+                        title={`Sposta su ${child.label}`}
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button
+                        onClick={() => moveChildMenuItemByOffset(item.id, child.id, 'down')}
+                        disabled={childIndex === childItems.length - 1}
+                        className="w-7 h-7 rounded-full inline-flex items-center justify-center disabled:opacity-40"
+                        style={{
+                          backgroundColor: 'var(--color-background)',
+                          color: 'var(--color-text)',
+                          border: '1px solid var(--color-border)',
+                        }}
+                        title={`Sposta giu ${child.label}`}
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button
                         onClick={() => handleEditRouteLabel(child, item.id)}
                         className="w-7 h-7 rounded-full inline-flex items-center justify-center"
                         style={{
@@ -944,23 +1061,28 @@ export function Header() {
 
             <div className="pt-4 space-y-2" style={{ borderTop: '1px solid var(--color-border)' }}>
               <div className="text-sm font-semibold mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                Tema
+                Contrasto
               </div>
-              {availableThemes.map((t) => (
+              {(['day', 'night'] as const).map((mode) => (
                 <button
-                  key={t.id}
+                  key={mode}
                   onClick={() => {
-                    setTheme(t.id);
+                    applyContrastMode(mode);
                     setMobileMenuOpen(false);
                   }}
                   className="w-full py-2 px-3 text-left flex items-center gap-3 rounded-lg"
                   style={{
-                    backgroundColor: theme.id === t.id ? 'var(--color-background)' : 'transparent',
+                    backgroundColor: contrastMode === mode ? 'var(--color-background)' : 'transparent',
                     color: 'var(--color-text)',
                   }}
                 >
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.colors.primary }} />
-                  <span className={theme.id === t.id ? 'font-semibold' : ''}>{t.name}</span>
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: mode === 'night' ? '#0f172a' : '#ffffff', border: '1px solid var(--color-border)' }}
+                  />
+                  <span className={contrastMode === mode ? 'font-semibold' : ''}>
+                    {mode === 'night' ? 'Night' : 'Day'}
+                  </span>
                 </button>
               ))}
             </div>

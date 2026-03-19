@@ -25,6 +25,8 @@ type SiteEvent = {
   date: string;
   time: string;
   body: string;
+  ctaText: string;
+  detailLink: string;
 };
 
 function normalizeEventDate(value: string) {
@@ -58,6 +60,8 @@ function getSiteEventsSorted(events: any[]): SiteEvent[] {
       date: normalizeEventDate(event?.date || '') || format(new Date(), 'yyyy-MM-dd'),
       time: normalizeEventTime(event?.time || '09:00'),
       body: String(event?.body || ''),
+      ctaText: String(event?.ctaText || 'Apri dettaglio'),
+      detailLink: String(event?.detailLink || ''),
     }))
     .sort(compareEvents);
 }
@@ -79,6 +83,8 @@ function createSiteEvent(date: string): SiteEvent {
     date,
     time: '09:00',
     body: 'Corpo evento in markdown.',
+    ctaText: 'Apri dettaglio',
+    detailLink: '',
   };
 }
 
@@ -105,6 +111,63 @@ function getSectionAnchor(section: Section, sectionIndex: number) {
   const candidateTitle = typeof section.title === 'string' ? section.title : getSectionLabel(section.type);
   const base = toAnchorSlug(candidateTitle || section.type || 'section');
   return `sec-${base || 'section'}-${sectionIndex + 1}`;
+}
+
+function collectMenuPaths(items: any[]): string[] {
+  return (Array.isArray(items) ? items : []).flatMap((item) => {
+    const ownPath = typeof item?.path === 'string' ? item.path : '';
+    const childPaths = collectMenuPaths(item?.children || []);
+    return [ownPath, ...childPaths].filter(Boolean);
+  });
+}
+
+function getSelectableSlugs(menu: any, pages: Record<string, any>) {
+  const pagePaths = Object.keys(pages || {}).map((pageId) => (pageId === 'home' ? '/' : `/${pageId}`));
+  const menuPaths = collectMenuPaths(menu?.items || []);
+  const all = Array.from(new Set(['/', ...menuPaths, ...pagePaths].filter(Boolean)));
+  return all.sort((a, b) => {
+    if (a === '/') return -1;
+    if (b === '/') return 1;
+    return a.localeCompare(b);
+  });
+}
+
+function SlugSelectField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  const resolvedOptions = value && !options.includes(value) ? [value, ...options] : options;
+
+  return (
+    <div className="w-full">
+      <div className="mb-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+        {label}
+      </div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="block w-full rounded px-3 py-2 text-sm"
+        style={{
+          backgroundColor: 'var(--color-background)',
+          color: 'var(--color-text)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        {resolvedOptions.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 export function ContentRenderer({ sections, pageId }: ContentRendererProps) {
@@ -742,12 +805,13 @@ function CalendarSection({ title, description, entries, notes, pageId, sectionIn
 }
 
 function EventsListSection({ title, description, indexTitle = 'Indice date', pageId, sectionIndex }: any) {
-  const { canEdit, site, updateSite } = useAdmin();
+  const { canEdit, site, updateSite, menu, content } = useAdmin();
   const events = getSiteEventsSorted(site?.events || []);
   const eventsByDate = groupEventsByDate(events);
   const orderedDates = Object.keys(eventsByDate).sort();
   const [selectedDateKey, setSelectedDateKey] = useState<string>(orderedDates[0] || '');
   const [isMiniCalendarOpen, setIsMiniCalendarOpen] = useState(false);
+  const slugOptions = getSelectableSlugs(menu, content?.pages || {});
 
   useEffect(() => {
     if (orderedDates.length === 0) {
@@ -858,7 +922,11 @@ function EventsListSection({ title, description, indexTitle = 'Indice date', pag
                   month={selectedDateKey ? parseISO(selectedDateKey) : undefined}
                   selected={selectedDateKey ? parseISO(selectedDateKey) : undefined}
                   onDayClick={(day) => {
-                    setSelectedDateKey(format(day, 'yyyy-MM-dd'));
+                    const nextDateKey = format(day, 'yyyy-MM-dd');
+                    setSelectedDateKey(nextDateKey);
+                    if (canEdit) {
+                      patchEvents([...events, createSiteEvent(nextDateKey)]);
+                    }
                     setIsMiniCalendarOpen(false);
                   }}
                   classNames={{
@@ -1022,6 +1090,28 @@ function EventsListSection({ title, description, indexTitle = 'Indice date', pag
                   />
                 </div>
               )}
+              {canEdit && (
+                <div className="mb-3 grid gap-2">
+                  <input
+                    type="text"
+                    value={event.ctaText}
+                    onChange={(e) => updateEvent(event.id, { ctaText: e.target.value })}
+                    placeholder="Testo CTA dettaglio"
+                    className="rounded px-3 py-2 text-sm"
+                    style={{
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  />
+                  <SlugSelectField
+                    label="Slug pagina dettaglio"
+                    value={event.detailLink}
+                    options={slugOptions}
+                    onChange={(value) => updateEvent(event.id, { detailLink: value })}
+                  />
+                </div>
+              )}
               <div
                 style={{
                   color: 'var(--color-text-secondary)',
@@ -1045,6 +1135,22 @@ function EventsListSection({ title, description, indexTitle = 'Indice date', pag
                   renderMarkdownText(event.body)
                 )}
               </div>
+              {!canEdit && event.detailLink.trim() && (
+                <div className="mt-4">
+                  <Link
+                    to={event.detailLink.trim()}
+                    className="inline-flex items-center gap-2 rounded-lg px-4 py-2 font-medium"
+                    style={{
+                      backgroundColor: 'var(--color-primary)',
+                      color: '#ffffff',
+                      borderRadius: 'var(--border-radius)',
+                    }}
+                  >
+                    {event.ctaText.trim() || 'Apri dettaglio'}
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              )}
             </article>
           ))}
           {selectedEvents.length === 0 && (
@@ -1307,9 +1413,20 @@ function PlaceSection({
 }
 
 function HeroSection({ title, subtitle, image, imageHeight = 256, imagePosX = 50, imagePosY = 50, imageScale = 100, cta, pageId, sectionIndex }: any) {
-  const { canEdit } = useAdmin();
+  const { canEdit, menu, content, updateContent } = useAdmin();
   const ctaText = cta?.text || 'Scopri di più';
   const ctaLink = cta?.link || '/';
+  const slugOptions = getSelectableSlugs(menu, content?.pages || {});
+
+  const updateHeroCtaLink = (nextLink: string) => {
+    const newContent = JSON.parse(JSON.stringify(content));
+    const targetSection = newContent.pages?.[pageId]?.sections?.[sectionIndex];
+    if (!targetSection?.cta) {
+      return;
+    }
+    targetSection.cta.link = nextLink;
+    updateContent(newContent);
+  };
 
   return (
     <div className="text-center py-20">
@@ -1382,10 +1499,13 @@ function HeroSection({ title, subtitle, image, imageHeight = 256, imagePosX = 50
             <ArrowRight className="w-5 h-5" />
           </Link>
           {canEdit && (
-            <div className="w-full max-w-md">
-              <div className="mb-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                Slug destinazione CTA
-              </div>
+            <div className="w-full max-w-md space-y-2">
+              <SlugSelectField
+                label="Slug destinazione CTA"
+                value={ctaLink}
+                options={slugOptions}
+                onChange={updateHeroCtaLink}
+              />
               <InlineEditor
                 value={ctaLink}
                 path={['pages', pageId, 'sections', sectionIndex, 'cta', 'link']}
